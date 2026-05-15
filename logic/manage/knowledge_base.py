@@ -196,21 +196,29 @@ async def handle_document_upload(message: Message):
         )
         return
 
-    # 4. Сохранение файла
+    # 4. ✅ Проверка на существование файла
     user_dir = _get_user_dir(user_id)
     dest_path = user_dir / filename
     
-    # Если файл с таким именем уже есть, добавим уникальный суффикс
     if dest_path.exists():
-        name, file_ext = os.path.splitext(filename)
-        dest_path = user_dir / f"{name}_{int(dest_path.stat().st_mtime)}{file_ext}"
+        await message.answer(
+            f"⚠️ <b>Файл уже существует!</b>\n"
+            f"Файл <code>{filename}</code> уже загружен в вашу базу знаний.\n\n"
+            f"💡 <b>Что делать:</b>\n"
+            f"• Удалите старый файл через раздел «🗑️ Удалить» и загрузите новый\n"
+            f"• Или переименуйте файл перед загрузкой",
+            parse_mode="HTML"
+        )
+        return
 
+    # 5. Сохранение файла
     await message.bot.download(doc, destination=dest_path)
     
-    # 5. Успешный ответ с остатком слотов
+    # 6. Успешный ответ с остатком слотов
     remaining = max_files - len(current_files) - 1
     await message.answer(
         f"✅ Файл <code>{dest_path.name}</code> успешно сохранён.\n"
         f"📊 Осталось свободных слотов: <b>{remaining}</b> из {max_files}.",
         parse_mode="HTML"
     )
+
