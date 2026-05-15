@@ -4,7 +4,7 @@ from pathlib import Path
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import CallbackQuery, Message
-from logic.manager.db import Database
+from logic.manage.db import Database
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 router = Router()
