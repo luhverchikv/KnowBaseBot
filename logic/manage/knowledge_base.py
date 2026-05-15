@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery, Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
+db = Database()
 BASE_DIR = Path("database")
 
 def _get_user_dir(user_id: int) -> Path:
@@ -152,20 +153,40 @@ async def cb_manage_back(call: CallbackQuery):
 @router.message(F.document)
 async def handle_document_upload(message: Message):
     doc = message.document
-    # Лимит 20 МБ (Telegram API обычно не пропускает больше)
+    
+    # 1. Проверка размера
     if doc.file_size and doc.file_size > 2 * 1024 * 1024:
         await message.answer("❌ Файл слишком большой. Максимальный размер: 2 МБ.")
         return
 
-    # Если файл с таким именем уже есть, добавим уникальный суффикс
-    dest_path = _get_user_dir(message.from_user.id) / doc.file_name
+    user_id = message.from_user.id
+    
+    # 2. Проверка лимита файлов
+    max_files = await asyncio.to_thread(db.get_user_max_files, user_id)
+    current_files = await asyncio.to_thread(_list_files, user_id)
+    
+    if len(current_files) >= max_files:
+        await message.answer(
+            f"❌ Превышен лимит файлов. Максимально разрешено: <b>{max_files}</b>.\n"
+            f"Сейчас загружено: <b>{len(current_files)}</b>.\n"
+            "Удалите ненужные файлы через раздел «🗑️ Удалить», чтобы загрузить новые.",
+            parse_mode="HTML"
+        )
+        return
+
+    # 3. Сохранение файла
+    dest_path = _get_user_dir(user_id) / doc.file_name
     if dest_path.exists():
         name, ext = os.path.splitext(doc.file_name)
-        dest_path = _get_user_dir(message.from_user.id) / f"{name}_{dest_path.stat().st_mtime:.0f}{ext}"
+        # Добавляем timestamp существующего файла, чтобы не перезаписывать
+        dest_path = _get_user_dir(user_id) / f"{name}_{int(dest_path.stat().st_mtime)}{ext}"
 
     await doc.download(destination_file=dest_path)
+    
+    # 4. Успешный ответ с остатком слотов
+    remaining = max_files - len(current_files) - 1
     await message.answer(
-        f"✅ Файл <code>{dest_path.name}</code> успешно сохранён в базу знаний.",
+        f"✅ Файл <code>{dest_path.name}</code> успешно сохранён.\n"
+        f"📊 Осталось свободных слотов: <b>{remaining}</b> из {max_files}.",
         parse_mode="HTML"
     )
-
