@@ -8,7 +8,7 @@ class Database:
         # Создаём директорию для БД, если её нет
         os.makedirs(os.path.dirname(path_to_database), exist_ok=True)
         
-        self.connection = sqlite3.connect(path_to_database)
+        self.connection = sqlite3.connect(path_to_database, check_same_thread=False)
         self.cursor = self.connection.cursor()
         
         # ⚠️ SQLite отключает проверку внешних ключей по умолчанию. Включаем явно.
