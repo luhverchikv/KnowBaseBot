@@ -1,6 +1,4 @@
 # logic/manage/knowledge_base.py
-
-# logic/manage/knowledge_base.py
 import os
 import asyncio
 from pathlib import Path
