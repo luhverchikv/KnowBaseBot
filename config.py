@@ -12,7 +12,7 @@ class TgBot:
 class AIConfig:
     api_key: str
     base_url: str = "https://vedai.by/api/v1"
-    model: str = "gpt-5-nano"
+    model: str = "gemini-2.5-flash-lite"
     temperature: float = 0.7
     max_tokens: int = 500
 
@@ -34,7 +34,7 @@ config = Config(
     ai=AIConfig(
         api_key=env.str('AI_API_KEY'),
         base_url=env.str('AI_BASE_URL', 'https://vedai.by/api/v1'),
-        model=env.str('AI_MODEL', 'gpt-5-nano'),
+        model=env.str('AI_MODEL', 'gemini-2.5-flash-lite'),
         temperature=env.float('AI_TEMPERATURE', 0.7),
         max_tokens=env.int('AI_MAX_TOKENS', 500)
     )
