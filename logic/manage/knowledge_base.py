@@ -64,7 +64,7 @@ async def cb_upload(call: CallbackQuery):
     await call.message.answer(
         "📤 <b>Загрузка файла</b>\n\n"
         "Отправьте файл (PDF, TXT, DOCX, CSV, MD).\n"
-        "Максимальный размер: 20 МБ.\n"
+        "Максимальный размер: 2 МБ.\n"
         "Файл будет сохранён в вашу личную базу знаний.",
         parse_mode="HTML"
     )
@@ -152,9 +152,9 @@ async def cb_manage_back(call: CallbackQuery):
 @router.message(F.document)
 async def handle_document_upload(message: Message):
     doc = message.document
-    # Лимит 20 МБ (Telegram API обычно не пропускает больше, но проверка полезна)
-    if doc.file_size and doc.file_size > 20 * 1024 * 1024:
-        await message.answer("❌ Файл слишком большой. Максимальный размер: 20 МБ.")
+    # Лимит 20 МБ (Telegram API обычно не пропускает больше)
+    if doc.file_size and doc.file_size > 2 * 1024 * 1024:
+        await message.answer("❌ Файл слишком большой. Максимальный размер: 2 МБ.")
         return
 
     # Если файл с таким именем уже есть, добавим уникальный суффикс
