@@ -22,16 +22,12 @@ class AIConnector:
             self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=45))
 
     async def _clean_json(self, text: str) -> str:
-        """Убирает markdown-обёртки 
-```json ... 
-``` из ответа AI"""
+        """Убирает markdown-обёртки ```json ... ``` из ответа AI"""
         text = text.strip()
         # ✅ Правильная проверка на три обратных кавычки
-        if text.startswith("
-```"):
+        if text.startswith("```"):
             text = text.split("\n", 1)[-1]
-        if text.endswith("
-```"):
+        if text.endswith("```"):
             text = text.rsplit("\n", 1)[0]
         return text.strip()
 
