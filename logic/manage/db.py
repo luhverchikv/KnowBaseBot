@@ -86,3 +86,11 @@ class Database:
         ''', (user_id, limit))
         return self.cursor.fetchall()
 
+    
+    def get_user_max_files(self, user_id: int) -> int:
+        """Возвращает максимальное количество файлов для пользователя."""
+        self.cursor.execute("SELECT max_files FROM users WHERE user_id = ?", (user_id,))
+        result = self.cursor.fetchone()
+        return result[0] if result else 3  # 3 по умолчанию, если запись не найдена
+
+
