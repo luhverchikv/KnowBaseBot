@@ -11,8 +11,8 @@ class TgBot:
 @dataclass
 class AIConfig:
     api_key: str
-    base_url: str = "https://api.openai.com/v1"
-    model: str = "gpt-3.5-turbo"
+    base_url: str = "https://vedai.by/api/v1"
+    model: str = "gpt-5-nano"
     temperature: float = 0.7
     max_tokens: int = 500
 
