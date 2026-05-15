@@ -33,8 +33,8 @@ config = Config(
     ),
     ai=AIConfig(
         api_key=env.str('AI_API_KEY'),
-        base_url=env.str('AI_BASE_URL', 'https://api.openai.com/v1'),
-        model=env.str('AI_MODEL', 'gpt-3.5-turbo'),
+        base_url=env.str('AI_BASE_URL', 'https://vedai.by/api/v1'),
+        model=env.str('AI_MODEL', 'gpt-5-nano'),
         temperature=env.float('AI_TEMPERATURE', 0.7),
         max_tokens=env.int('AI_MAX_TOKENS', 500)
     )
