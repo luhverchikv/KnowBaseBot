@@ -182,7 +182,7 @@ async def handle_document_upload(message: Message):
         # Добавляем timestamp существующего файла, чтобы не перезаписывать
         dest_path = _get_user_dir(user_id) / f"{name}_{int(dest_path.stat().st_mtime)}{ext}"
 
-    await doc.download(destination_file=dest_path)
+    await message.bot.download(doc, destination=dest_path)
     
     # 4. Успешный ответ с остатком слотов
     remaining = max_files - len(current_files) - 1
