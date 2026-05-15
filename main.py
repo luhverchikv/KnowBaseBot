@@ -4,7 +4,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from config import config
 from utils.logger import setup_logging, logger
-
+from logic.ai_connector import ai_client
 from menu.start_menu import router as menu_router
 from logic.manage.knowledge_base import router as kb_router
 from logic.quiz import router as quiz_router
@@ -32,6 +32,7 @@ async def main():
         logger.error("Bot polling failed: {}", str(e))
         raise
     finally:
+        await ai_client.close()
         logger.info("Bot shutting down")
 
 
