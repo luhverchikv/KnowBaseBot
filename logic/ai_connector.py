@@ -22,21 +22,42 @@ class AIConnector:
             self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=45))
 
     async def _clean_json(self, text: str) -> str:
+        """Убирает markdown-обёртки 
+```json ... 
+``` из ответа AI"""
         text = text.strip()
+        # ✅ Правильная проверка на три обратных кавычки
         if text.startswith("
-```"): text = text.split("\n", 1)[-1]
+```"):
+            text = text.split("\n", 1)[-1]
         if text.endswith("
-```"): text = text.rsplit("\n", 1)[0]
+```"):
+            text = text.rsplit("\n", 1)[0]
         return text.strip()
 
     async def _call_api(self, prompt: str, system_prompt: str) -> Tuple[bool, Optional[Dict], str]:
         await self._ensure_session()
-        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        payload = {"model": self.model, "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}], "temperature": self.temperature, "max_tokens": self.max_tokens}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens
+        }
 
         for attempt in range(self.max_retries):
             try:
-                async with self.session.post(f"{self.base_url}/chat/completions", json=payload, headers=headers) as resp:
+                async with self.session.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers=headers
+                ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         raw = data["choices"][0]["message"]["content"]
@@ -48,8 +69,10 @@ class AIConnector:
                     else:
                         return False, None, f"HTTP {resp.status}: {await resp.text()}"
             except asyncio.TimeoutError:
-                if attempt < self.max_retries - 1: await asyncio.sleep(2)
-                else: return False, None, "Timeout"
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(2)
+                else:
+                    return False, None, "Timeout"
             except aiohttp.ClientError as e:
                 return False, None, f"Network: {e}"
             except Exception as e:
@@ -67,8 +90,10 @@ class AIConnector:
         return await self._call_api(prompt, system)
 
     async def close(self):
-        if self.session and not self.session.closed: await self.session.close()
+        if self.session and not self.session.closed:
+            await self.session.close()
 
+# Синглтон для удобного импорта
 ai_client = AIConnector()
 
 
