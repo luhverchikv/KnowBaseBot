@@ -7,6 +7,8 @@ from utils.logger import setup_logging, logger
 
 from menu.start_menu import router as menu_router
 from logic.manage.knowledge_base import router as kb_router
+from logic.quiz import router as quiz_router
+
 
 async def main():
     
@@ -21,6 +23,7 @@ async def main():
 
     dp.include_router(menu_router)
     dp.include_router(kb_router)
+    dp.include_router(quiz_router)
     
     try:
         logger.info("Starting bot polling")
