@@ -5,7 +5,7 @@ from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import CallbackQuery, Message
 from logic.manage.db import Database
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram.utils.keyboard import ReplyKeyboardBuilder, KeyboardButton
 
 router = Router()
 db = Database()
