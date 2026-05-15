@@ -113,16 +113,6 @@ class Database:
         res = self.cursor.fetchone()
         return res[0] if res else 3
 
-    def add_quiz_question(self, user_id: int, source_file: str, question: str, 
-                          correct_answer: str, user_answer: Optional[str] = None, 
-                          correctness: Optional[str] = None, rating: Optional[int] = None, 
-                          feedback: Optional[str] = None) -> int:
-        with self.connection:
-            self.cursor.execute('''
-                INSERT INTO quiz_questions (user_id, source_file, question, correct_answer,  
-                user_answer, correctness, rating, feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, source_file, question, correct_answer, user_answer, correctness, rating, feedback))
-            return self.cursor.lastrowid
 
     def update_quiz_result(self, question_id: int, user_answer: str, correctness: str, feedback: str) -> None:
         with self.connection:
