@@ -93,4 +93,51 @@ class Database:
         result = self.cursor.fetchone()
         return result[0] if result else 3  # 3 по умолчанию, если запись не найдена
 
+    def get_random_user_file(self, user_id: int) -> Optional[str]:
+        user_dir = Path("database") / str(user_id)
+        if not user_dir.exists(): return None
+        files = [f.name for f in user_dir.iterdir() if f.is_file() and f.suffix.lower() == '.md']
+        return random.choice(files) if files else None
+
+    def get_daily_questions_count(self, user_id: int) -> int:
+        self.cursor.execute("""
+            SELECT COUNT(*) FROM quiz_questions
+            WHERE user_id = ? AND DATE(generated_at) = DATE('now')
+        """, (user_id,))
+        return self.cursor.fetchone()[0]
+
+    def get_max_questions_per_day(self, user_id: int) -> int:
+        self.cursor.execute("SELECT max_questions_per_day FROM users WHERE user_id = ?", (user_id,))
+        res = self.cursor.fetchone()
+        return res[0] if res else 3
+
+    def add_quiz_question(self, user_id: int, source_file: str, question: str, 
+                          correct_answer: str, user_answer: Optional[str] = None, 
+                          correctness: Optional[str] = None, rating: Optional[int] = None, 
+                          feedback: Optional[str] = None) -> int:
+        with self.connection:
+            self.cursor.execute('''
+                INSERT INTO quiz_questions (user_id, source_file, question, correct_answer,  
+                user_answer, correctness, rating, feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, source_file, question, correct_answer, user_answer, correctness, rating, feedback))
+            return self.cursor.lastrowid
+
+    def update_quiz_result(self, question_id: int, user_answer: str, correctness: str, feedback: str) -> None:
+        with self.connection:
+            self.cursor.execute(
+                "UPDATE quiz_questions SET user_answer=?, correctness=?, feedback=? WHERE id=?",
+                (user_answer, correctness, feedback, question_id)
+            )
+
+    def update_quiz_rating(self, question_id: int, rating: int) -> None:
+        with self.connection:
+            self.cursor.execute("UPDATE quiz_questions SET rating=? WHERE id=?", (rating, question_id))
+
+    def get_user_questions(self, user_id: int, limit: int = 50) -> List[Tuple]:
+        self.cursor.execute('''
+            SELECT id, generated_at, source_file, question, correct_answer, 
+                   user_answer, correctness, rating, feedback
+            FROM quiz_questions WHERE user_id = ? ORDER BY generated_at DESC LIMIT ?
+        ''', (user_id, limit))
+        return self.cursor.fetchall()
 
