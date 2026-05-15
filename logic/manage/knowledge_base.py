@@ -11,16 +11,27 @@ router = Router()
 db = Database()
 BASE_DIR = Path("database")
 
+# ✅ Разрешённые расширения (только markdown)
+ALLOWED_EXTENSIONS = {".md", ".markdown"}
+
+
 def _get_user_dir(user_id: int) -> Path:
     """Возвращает путь к директории пользователя, создаёт её при необходимости."""
     user_dir = BASE_DIR / str(user_id)
     user_dir.mkdir(parents=True, exist_ok=True)
     return user_dir
 
-def _list_files(user_id: int) -> list[str]:
-    """Возвращает отсортированный список файлов пользователя."""
-    return sorted([f.name for f in _get_user_dir(user_id).iterdir() if f.is_file()])
 
+def _list_files(user_id: int) -> list[str]:
+    """Возвращает отсортированный список .md файлов пользователя."""
+    user_dir = _get_user_dir(user_id)
+    # ✅ Фильтруем только разрешённые расширения
+    return sorted([
+        f.name for f in user_dir.iterdir() 
+        if f.is_file() and f.suffix.lower() in ALLOWED_EXTENSIONS
+    ])
+    
+    
 def _delete_file(user_id: int, filename: str) -> bool:
     """Удаляет файл. Возвращает True при успехе."""
     file_path = _get_user_dir(user_id) / filename
@@ -152,15 +163,27 @@ async def cb_manage_back(call: CallbackQuery):
 @router.message(F.document)
 async def handle_document_upload(message: Message):
     doc = message.document
+    filename = doc.file_name or "unknown"
     
-    # 1. Проверка размера
+    # ✅ 1. Проверка расширения файла
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in ALLOWED_EXTENSIONS:
+        await message.answer(
+            f"❌ Недопустимый формат файла.\n"
+            f"Разрешены только файлы <b>.md</b> (Markdown).\n"
+            f"Ваш файл: <code>{filename}</code>",
+            parse_mode="HTML"
+        )
+        return
+    
+    # 2. Проверка размера
     if doc.file_size and doc.file_size > 2 * 1024 * 1024:
         await message.answer("❌ Файл слишком большой. Максимальный размер: 2 МБ.")
         return
 
     user_id = message.from_user.id
     
-    # 2. Проверка лимита файлов
+    # 3. Проверка лимита файлов
     max_files = await asyncio.to_thread(db.get_user_max_files, user_id)
     current_files = await asyncio.to_thread(_list_files, user_id)
     
@@ -173,16 +196,18 @@ async def handle_document_upload(message: Message):
         )
         return
 
-    # 3. Сохранение файла
-    dest_path = _get_user_dir(user_id) / doc.file_name
+    # 4. Сохранение файла
+    user_dir = _get_user_dir(user_id)
+    dest_path = user_dir / filename
+    
+    # Если файл с таким именем уже есть, добавим уникальный суффикс
     if dest_path.exists():
-        name, ext = os.path.splitext(doc.file_name)
-        # Добавляем timestamp существующего файла, чтобы не перезаписывать
-        dest_path = _get_user_dir(user_id) / f"{name}_{int(dest_path.stat().st_mtime)}{ext}"
+        name, file_ext = os.path.splitext(filename)
+        dest_path = user_dir / f"{name}_{int(dest_path.stat().st_mtime)}{file_ext}"
 
     await message.bot.download(doc, destination=dest_path)
     
-    # 4. Успешный ответ с остатком слотов
+    # 5. Успешный ответ с остатком слотов
     remaining = max_files - len(current_files) - 1
     await message.answer(
         f"✅ Файл <code>{dest_path.name}</code> успешно сохранён.\n"
