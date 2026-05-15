@@ -30,10 +30,8 @@ async def command_start(message: Message) -> None:
     if not await asyncio.to_thread(db.user_exists, user_id):
         await asyncio.to_thread(db.add_user, user_id)
 
-    #if not db.user_exists(user_id):
-        #db.add_user(user_id) # внести пользователя в таблицу users
-        # если не моздано, то создать директорию, где будут храниться файлы базы знаний
-        # если не создано, то создать таблицу пользователя с вопросами
+    # если не создано, то создать директорию {user_id}, где будут храниться файлы базы знаний
+    # если не создано, то создать таблицу пользователя с вопросами
 
     await message.answer(
         text=start_text,
