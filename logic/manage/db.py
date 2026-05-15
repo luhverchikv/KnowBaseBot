@@ -20,3 +20,16 @@ class Database:
                 max_questions_per_day  INTEGER NOT NULL DEFAULT 3,
                 reminders              INTEGER NOT NULL DEFAULT 0
              )''')
+            
+    def user_exists(self, user_id: int) -> bool:
+        """Проверяет, существует ли пользователь с таким user_id."""
+        self.cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+        return self.cursor.fetchone() is not None
+
+    def add_user(self, user_id: int) -> None:
+        """Добавляет нового пользователя в базу данных."""
+        with self.connection:  # автоматически вызывает commit()
+            self.cursor.execute(
+                "INSERT INTO users (user_id) VALUES (?)", 
+                (user_id,)
+            )
