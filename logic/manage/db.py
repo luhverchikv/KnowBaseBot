@@ -1,6 +1,8 @@
 # logic/manage/db.py
 import sqlite3
 import os
+import random
+from pathlib import Path
 from typing import Optional, List, Tuple
 
 class Database:
