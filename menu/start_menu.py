@@ -37,3 +37,14 @@ async def command_start(message: Message) -> None:
         reply_markup=start_keyboard(),
         parse_mode="HTML"
     )
+    
+    
+    
+@router.message(F.text == '/help')
+async def user_help_handler(message: Message):
+    await message.delete()
+    await message.answer(
+    "Мы на связи для вас!\n\n"
+    "Если у вас есть замечание или идея для улучшения рабочих процессов, а может просто хотите поделиться своим мнением — напишите нам.\n"
+    "Спасибо, что помогаете нам становиться лучше! ❤️\n\n"
+    )
