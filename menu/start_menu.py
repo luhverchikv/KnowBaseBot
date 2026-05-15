@@ -1,5 +1,6 @@
 # menu/start_menu.py
 import asyncio
+from pathlib import Path
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
@@ -19,19 +20,21 @@ def start_keyboard():
         ]
     )
 
-start_text = """
-Привет!
-"""
+start_text = """Привет!"""
 
 @router.message(CommandStart())
 async def command_start(message: Message) -> None:
     await message.delete()
     user_id = message.from_user.id
+    # 1. Работа с БД
     if not await asyncio.to_thread(db.user_exists, user_id):
         await asyncio.to_thread(db.add_user, user_id)
 
-    # если не создано, то создать директорию {user_id}, где будут храниться файлы базы знаний
-    # если не создано, то создать таблицу пользователя с вопросами
+    # 2. Создание директории для файлов базы знаний пользователя
+    user_dir = Path("database") / str(user_id)
+    # parents=True: создаст папку database/, если её нет
+    # exist_ok=True: не вызовет ошибку, если папка уже существует
+    await asyncio.to_thread(user_dir.mkdir, parents=True, exist_ok=True)
 
     await message.answer(
         text=start_text,
