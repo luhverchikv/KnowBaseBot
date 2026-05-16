@@ -61,15 +61,23 @@ async def admin_stats_handler(call: CallbackQuery):
     total_users = await asyncio.to_thread(db.get_total_users_count)
     today_qs = await asyncio.to_thread(db.get_questions_count_today)
     yesterday_qs = await asyncio.to_thread(db.get_questions_count_yesterday)
+    
+    # ✅ Статистика токенов (за всё время)
+    token_stats = await asyncio.to_thread(db.get_token_stats, user_id=None)  # None = все пользователи
 
     text = (
         f"📊 <b>Общая статистика</b>\n\n"
         f"👥 Всего пользователей: <b>{total_users}</b>\n"
         f"📅 Вопросов сгенерировано сегодня: <b>{today_qs}</b>\n"
-        f" Вопросов сгенерировано вчера: <b>{yesterday_qs}</b>"
+        f"📅 Вопросов сгенерировано вчера: <b>{yesterday_qs}</b>\n\n"
+        f"🪙 <b>Расход токенов (всё время):</b>\n"
+        f"• 📝 Генерация вопросов: <b>{token_stats['generation']:,}</b>\n"
+        f"• ✅ Оценка ответов: <b>{token_stats['evaluation']:,}</b>\n"
+        f"• 📊 <b>Всего:</b> {token_stats['total']:,} токенов"
     )
     # Обновляем сообщение, сохраняя клавиатуру
     await call.message.edit_text(text, reply_markup=admin_keyboard(), parse_mode="HTML")
+
 
 
 @router.callback_query(F.data == "admin_close", is_owner)
