@@ -17,13 +17,9 @@ ADMIN_WELCOME = """
 🛠 <b>Доступные функции:</b>
 • 📊 Статистика по пользователям
 • ⚙️ Управление лимитами
-• 🗄️ Экспорт/импорт базы знаний
-• 🧹 Очистка кэша и логов
+• 🧹 Очистка логов
 
 Выберите действие ниже или введите команду:
-• /admin_stats — подробная статистика
-• /admin_users — список пользователей
-• /admin_config — настройка параметров
 """
 
 def admin_keyboard():
@@ -31,13 +27,10 @@ def admin_keyboard():
     kb = InlineKeyboardBuilder()
     kb.row(
         InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats"),
-        InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users")
-    )
-    kb.row(
+        InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users"),
         InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_config"),
-        InlineKeyboardButton(text="🗄️ База данных", callback_data="admin_db")
+        InlineKeyboardButton(text="🔙 В бот", callback_data="admin_close"),
     )
-    kb.row(InlineKeyboardButton(text="🔙 В бот", callback_data="admin_back"))
     return kb.as_markup()
 
 @router.message(Command("admin"), is_owner)
@@ -54,9 +47,8 @@ async def admin_denied(message: Message):
     """Обработка попытки доступа не-владельца к /admin."""
     await message.answer("🔒 Доступ запрещён. Эта команда доступна только владельцу бота.")
 
-@router.callback_query(F.data == "admin_back")
-async def admin_back(call: CallbackQuery, is_owner: bool):
-    """Возврат из админ-панели (заглушка — можно доработать)."""
+@router.callback_query(F.data == "admin_close")
+async def admin_back(call: CallbackQuery, is_owner):
     await call.answer()
-    await call.message.answer("🔙 Вы вышли из панели администратора.")
+    await call.message.delete()
 
