@@ -71,18 +71,27 @@ class Database:
 
     # ===================== QUIZ QUESTIONS =====================
     def add_quiz_question(self, user_id: int, source_file: str, question: str, 
-                          correct_answer: str, user_answer: Optional[str] = None, 
-                          correctness: Optional[str] = None, rating: Optional[int] = None, 
-                          feedback: Optional[str] = None) -> int:
-        """Добавляет запись о вопросе/результате квиза."""
+                      correct_answer: str, user_answer: Optional[str] = None, 
+                      correctness: Optional[str] = None, rating: Optional[int] = None, 
+                      feedback: Optional[str] = None,
+                      gen_tokens: Optional['TokenUsage'] = None) -> int:  # type: ignore
         with self.connection:
             self.cursor.execute('''
                 INSERT INTO quiz_questions (
-                    user_id, source_file, question, correct_answer, 
-                    user_answer, correctness, rating, feedback
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, source_file, question, correct_answer, user_answer, correctness, rating, feedback))
+                    user_id, source_file, question, correct_answer,  
+                    user_answer, correctness, rating, feedback,
+                    gen_prompt_tokens, gen_completion_tokens, gen_total_tokens
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user_id, source_file, question, correct_answer,
+                user_answer, correctness, rating, feedback,
+                gen_tokens.prompt_tokens if gen_tokens else 0,
+                gen_tokens.completion_tokens if gen_tokens else 0,
+                gen_tokens.total_tokens if gen_tokens else 0
+            ))
             return self.cursor.lastrowid
+    
+
 
     def get_user_questions(self, user_id: int, limit: int = 50) -> List[Tuple]:
         """Возвращает последние N вопросов пользователя."""
