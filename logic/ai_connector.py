@@ -44,10 +44,10 @@ class AIConnector:
         # Удаляем закрывающую обёртку
         if text.endswith("```"):
             text = text[:-3]
-        
         return text.strip()
 
-    async def _call_api(self, prompt: str, system_prompt: str) -> Tuple[bool, Optional[Dict], str]:
+
+    async def _call_api(self, prompt: str, system_prompt: str) -> Tuple[bool, Optional[Dict], str, Optional[TokenUsage]]:
         await self._ensure_session()
         headers = {
             "Authorization": f"Bearer {self.api_key}",
