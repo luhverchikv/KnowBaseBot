@@ -214,3 +214,26 @@ class Database:
             'total': row[2] or 0
         }
     
+def get_token_stats(self, user_id: Optional[int] = None, days: int = None) -> dict:
+    """
+    Возвращает статистику токенов.
+    Если user_id=None — агрегирует по всем пользователям.
+    """
+    user_filter = f"AND user_id = {user_id}" if user_id is not None else ""
+    date_filter = f"AND DATE(generated_at) >= DATE('now', '-{days} days')" if days else ""
+    
+    self.cursor.execute(f'''
+        SELECT 
+            COALESCE(SUM(gen_total_tokens), 0) as gen_total,
+            COALESCE(SUM(eval_total_tokens), 0) as eval_total,
+            COALESCE(SUM(gen_total_tokens + eval_total_tokens), 0) as grand_total
+        FROM quiz_questions 
+        WHERE 1=1 {user_filter} {date_filter}
+    ''')
+    row = self.cursor.fetchone()
+    return {
+        'generation': row[0] or 0,
+        'evaluation': row[1] or 0,
+        'total': row[2] or 0
+    }
+
