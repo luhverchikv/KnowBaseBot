@@ -70,15 +70,27 @@ class AIConnector:
                     json=payload,
                     headers=headers
                 ) as resp:
+                    # В методе _call_api, внутри блока if resp.status == 200:
                     if resp.status == 200:
                         data = await resp.json()
                         raw = data["choices"][0]["message"]["content"]
+                        
+                        # ✅ Извлекаем статистику токенов
+                        usage_data = data.get("usage", {})
+                        token_usage = TokenUsage(
+                            prompt_tokens=usage_data.get("prompt_tokens", 0),
+                            completion_tokens=usage_data.get("completion_tokens", 0),
+                            total_tokens=usage_data.get("total_tokens", 0)
+                        )
+                        
                         try:
                             cleaned = await self._clean_json(raw)
-                            return True, json.loads(cleaned), ""
+                            return True, json.loads(cleaned), "", token_usage  # ✅ Возвращаем 4 значения
                         except json.JSONDecodeError as e:
                             logger.warning(f"JSON decode failed. Raw: {raw[:200]}...")
-                            return False, None, f"AI вернул невалидный JSON: {e}"
+                            return False, None, f"AI вернул невалидный JSON: {e}", None
+                    
+                    
                     elif resp.status == 429:
                         wait = 2 ** attempt
                         logger.warning(f"429. Retry {attempt+1} in {wait}s")
