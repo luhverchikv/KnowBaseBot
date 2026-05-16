@@ -111,13 +111,14 @@ class AIConnector:
         
         return False, None, "Max retries exceeded"
 
-    async def generate_quiz_question(self, md_text: str) -> Tuple[bool, Dict, str]:
+    async def generate_quiz_question(self, md_text: str) -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
         system = "Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text."
-        safe_text = md_text[:3000]  # защита от переполнения контекста
+        safe_text = md_text[:3000]
         prompt = f"Generate ONE clear quiz question and its exact correct answer based on this text:\n{safe_text}"
         return await self._call_api(prompt, system)
 
-    async def evaluate_answer(self, question: str, correct: str, user: str) -> Tuple[bool, Dict, str]:
+
+    async def evaluate_answer(self, question: str, correct: str, user: str) -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
         system = "Return strictly valid JSON with keys: 'correctness' (one of: 'правильно','частично','неправильно'), 'feedback' (short explanation in Russian), 'rating' (1-5)."
         prompt = f"Question: {question}\nCorrect: {correct}\nUser: {user}\nEvaluate and return JSON only."
         return await self._call_api(prompt, system)
