@@ -42,12 +42,15 @@ async def admin_panel(message: Message):
         reply_markup=admin_keyboard(),
         parse_mode="HTML"
     )
+    await message.delete()
+
 
 @router.message(Command("admin"), ~is_owner)
 async def admin_denied(message: Message):
     """Обработка попытки доступа не-владельца к /admin."""
     await message.answer("🔒 Доступ запрещён. Эта команда доступна только владельцу бота.")
-
+    await message.delete()
+    
 
 @router.callback_query(F.data == "admin_stats", is_owner)
 async def admin_stats_handler(call: CallbackQuery):
