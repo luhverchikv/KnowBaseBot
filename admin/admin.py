@@ -48,7 +48,7 @@ async def admin_denied(message: Message):
     await message.answer("🔒 Доступ запрещён. Эта команда доступна только владельцу бота.")
 
 
-@router.callback_query(F.data == "admin_stats")
+@router.callback_query(F.data == "admin_stats", is_owner)
 async def admin_stats_handler(call: CallbackQuery):
     """Обработчик кнопки «Статистика»."""
     await call.answer()
