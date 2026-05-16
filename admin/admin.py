@@ -30,6 +30,7 @@ def admin_keyboard():
     kb.row(InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats"))
     kb.row(InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users"))
     kb.row(InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_config"))
+    kb.row(InlineKeyboardButton(text="🪙 Токены за сутки", callback_data="admin_tokens_day"))
     kb.row(InlineKeyboardButton(text="🔙 Закрыть панель", callback_data="admin_close"))
     return kb.as_markup()
 
@@ -96,6 +97,20 @@ async def admin_tokens_handler(call: CallbackQuery):
         f"📝 Генерация вопросов: <b>{stats['generation']}</b>\n"
         f"✅ Оценка ответов: <b>{stats['evaluation']}</b>\n"
         f"📊 <b>Всего:</b> {stats['total']} токенов"
+    )
+    await call.message.edit_text(text, reply_markup=admin_keyboard(), parse_mode="HTML")
+
+
+@router.callback_query(F.data == "admin_tokens_day")
+async def admin_tokens_day(call: CallbackQuery):
+    """Токены за последние 24 часа."""
+    await call.answer()
+    stats = await asyncio.to_thread(db.get_token_stats, user_id=None, days=1)
+    text = (
+        f"🪙 <b>Токены за сутки</b>\n\n"
+        f"📝 Генерация: <b>{stats['generation']:,}</b>\n"
+        f"✅ Оценка: <b>{stats['evaluation']:,}</b>\n"
+        f"📊 <b>Всего:</b> {stats['total']:,} токенов"
     )
     await call.message.edit_text(text, reply_markup=admin_keyboard(), parse_mode="HTML")
 
