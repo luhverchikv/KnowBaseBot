@@ -47,6 +47,27 @@ async def admin_denied(message: Message):
     """Обработка попытки доступа не-владельца к /admin."""
     await message.answer("🔒 Доступ запрещён. Эта команда доступна только владельцу бота.")
 
+
+@router.callback_query(F.data == "admin_stats")
+async def admin_stats_handler(call: CallbackQuery):
+    """Обработчик кнопки «Статистика»."""
+    await call.answer()
+    
+    # Асинхронные запросы к БД (не блокируем event loop)
+    total_users = await asyncio.to_thread(db.get_total_users_count)
+    today_qs = await asyncio.to_thread(db.get_questions_count_today)
+    yesterday_qs = await asyncio.to_thread(db.get_questions_count_yesterday)
+
+    text = (
+        f"📊 <b>Общая статистика</b>\n\n"
+        f"👥 Всего пользователей: <b>{total_users}</b>\n"
+        f"📅 Вопросов сгенерировано сегодня: <b>{today_qs}</b>\n"
+        f" Вопросов сгенерировано вчера: <b>{yesterday_qs}</b>"
+    )
+    # Обновляем сообщение, сохраняя клавиатуру
+    await call.message.edit_text(text, reply_markup=admin_keyboard(), parse_mode="HTML")
+
+
 @router.callback_query(F.data == "admin_close", is_owner)
 async def admin_back(call: CallbackQuery):
     await call.answer()
