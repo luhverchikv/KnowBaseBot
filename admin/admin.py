@@ -5,8 +5,10 @@ from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from utils.filter import is_owner
+from logic.manage.db import Database
 
 router = Router()
+db = Database()
 
 # Текст приветствия администратора
 ADMIN_WELCOME = """
