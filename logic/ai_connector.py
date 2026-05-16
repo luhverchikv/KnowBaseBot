@@ -19,7 +19,7 @@ class AIConnector:
 
     async def _ensure_session(self):
         if self.session is None or self.session.closed:
-            self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=45))
+            self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=90))
 
     async def _clean_json(self, text: str) -> str:
         """Убирает markdown-обёртки ```json ... ``` из ответа AI"""
