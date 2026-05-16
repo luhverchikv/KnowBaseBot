@@ -5,6 +5,15 @@ import aiohttp
 from typing import Dict, Tuple, Optional
 from config import config
 from utils.logger import logger
+from dataclasses import dataclass
+
+@dataclass
+class TokenUsage:
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
 
 class AIConnector:
     def __init__(self):
