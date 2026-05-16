@@ -31,6 +31,8 @@ async def quiz_menu(message: Message):
         parse_mode="HTML"
     )
 
+# logic/quiz.py (фрагменты с исправлениями)
+
 @router.callback_query(F.data == "quiz_generate")
 async def handle_generate(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -55,18 +57,17 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
         return
 
     await call.message.answer("⏳ Генерирую вопрос...")
-    success, qa, err = await ai_client.generate_quiz_question(md_text)
+    # ✅ ИСПРАВЛЕНО: распаковываем 4 значения
+    success, qa, err, gen_tokens = await ai_client.generate_quiz_question(md_text)
     if not success:
         await call.message.answer(f"❌ AI ошибка: {err}")
         return
 
     q_id = await asyncio.to_thread(
         db.add_quiz_question,
-        user_id,
-        filename,
-        qa.get("question", "?"),
-        qa.get("correct_answer", "?"),
-        gen_tokens=gen_tokens
+        user_id, filename,
+        qa.get("question", "?"), qa.get("correct_answer", "?"),
+        gen_tokens=gen_tokens  # ✅ Передаём токены генерации
     )
     
     await state.update_data(
@@ -76,9 +77,7 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     )
     await state.set_state(QuizStates.waiting_answer)
     
-    kb = InlineKeyboardBuilder().row(
-        InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel")
-    )
+    kb = InlineKeyboardBuilder().row(InlineKeyboardButton(text=" Отмена", callback_data="quiz_cancel"))
     await call.message.answer(
         f"❓ <b>Вопрос:</b>\n{qa.get('question', '?')}\n\nНапишите ответ:",
         reply_markup=kb.as_markup(),
@@ -95,29 +94,26 @@ async def handle_answer(message: Message, state: FSMContext):
 
     await message.answer("⏳ ИИ оценивает ваш ответ...")
     
-    # ✅ Вызываем AI для оценки ответа (возвращает correctness, feedback, rating)
-    success, res, err = await ai_client.evaluate_answer(question, correct, user_answer)
+    # ✅ ИСПРАВЛЕНО: распаковываем 4 значения
+    success, res, err, eval_tokens = await ai_client.evaluate_answer(question, correct, user_answer)
     if not success:
         await message.answer(f"❌ Оценка не удалась: {err}")
         await state.clear()
         return
-    # ✅ Сохраняем токены оценки
-    if eval_tokens:
-        await asyncio.to_thread(db.update_eval_tokens, q_id, eval_tokens)
 
     correctness = res.get("correctness", "неправильно")
     feedback = res.get("feedback", "Оценка завершена.")
-    rating = res.get("rating", 3)  # ✅ Рейтинг от ИИ (1-5)
+    rating = res.get("rating", 3)
 
-    # ✅ Сохраняем результат и рейтинг от ИИ
+    # ✅ Сохраняем токены оценки (если они есть)
+    if eval_tokens:
+        await asyncio.to_thread(db.update_eval_tokens, q_id, eval_tokens)
+
     await asyncio.to_thread(db.update_quiz_result, q_id, user_answer, correctness, feedback)
     await asyncio.to_thread(db.update_quiz_rating, q_id, rating)
-    await state.clear()  # ✅ Сбрасываем состояние сразу
+    await state.clear()
 
-    # ✅ Формируем красивый ответ с эмодзи и баллом
-    emoji = {"правильно": "✅", "частично": "🔶", "неправильно": "❌"}.get(correctness, "❓")
-    
-    # Визуализация рейтинга звёздами
+    emoji = {"правильно": "✅", "частично": "🔶", "неправильно": ""}.get(correctness, "❓")
     stars = "⭐" * rating + "☆" * (5 - rating)
     
     await message.answer(
@@ -129,6 +125,7 @@ async def handle_answer(message: Message, state: FSMContext):
         reply_markup=quiz_menu_keyboard(),
         parse_mode="HTML"
     )
+
 
 @router.callback_query(F.data == "quiz_cancel")
 async def cancel_quiz(call: CallbackQuery, state: FSMContext):
