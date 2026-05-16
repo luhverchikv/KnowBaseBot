@@ -89,6 +89,7 @@ class Database:
                 gen_tokens.completion_tokens if gen_tokens else 0,
                 gen_tokens.total_tokens if gen_tokens else 0
             ))
+            logger.info(f"💾 Saving gen_tokens: {gen_tokens}")
             return self.cursor.lastrowid
     
 
