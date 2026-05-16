@@ -157,3 +157,18 @@ class Database:
             'total': total
         }
 
+    def get_total_users_count(self) -> int:
+        """Возвращает общее количество пользователей."""
+        self.cursor.execute("SELECT COUNT(*) FROM users")
+        return self.cursor.fetchone()[0]
+
+    def get_questions_count_today(self) -> int:
+        """Возвращает количество вопросов, сгенерированных сегодня."""
+        self.cursor.execute("SELECT COUNT(*) FROM quiz_questions WHERE DATE(generated_at) = DATE('now')")
+        return self.cursor.fetchone()[0]
+
+    def get_questions_count_yesterday(self) -> int:
+        """Возвращает количество вопросов, сгенерированных вчера."""
+        self.cursor.execute("SELECT COUNT(*) FROM quiz_questions WHERE DATE(generated_at) = DATE('now', '-1 day')")
+        return self.cursor.fetchone()[0]
+
