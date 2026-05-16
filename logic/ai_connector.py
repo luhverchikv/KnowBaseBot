@@ -34,16 +34,11 @@ class AIConnector:
         )
 
     async def _clean_json(self, text: str) -> str:
-        """Убирает markdown-обёртки 
-```json ... 
-``` из ответа AI"""
+        """Убирает markdown-обёртки ```json ... ``` из ответа AI"""
         text = text.strip()
         
-        # Удаляем открывающую обёртку с любым суффиксом (
-```json, 
-```python и т.д.)
-        if text.startswith("
-```"):
+        # Удаляем открывающую обёртку с любым суффиксом (```json, ```python и т.д.)
+        if text.startswith("```"):
             first_newline = text.find("\n")
             if first_newline != -1:
                 text = text[first_newline + 1:]
@@ -51,8 +46,7 @@ class AIConnector:
                 text = text[3:]
         
         # Удаляем закрывающую обёртку
-        if text.endswith("
-```"):
+        if text.endswith("```"):
             text = text[:-3]
         
         return text.strip()
