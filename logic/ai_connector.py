@@ -1,5 +1,4 @@
 # logic/ai_connector.py
-
 import json
 import asyncio
 import aiohttp
@@ -24,11 +23,19 @@ class AIConnector:
     async def _clean_json(self, text: str) -> str:
         """Убирает markdown-обёртки ```json ... ``` из ответа AI"""
         text = text.strip()
-        # ✅ Правильная проверка на три обратных кавычки
+        
+        # Удаляем открывающую обёртку с любым суффиксом (```json, ```python и т.д.)
         if text.startswith("```"):
-            text = text.split("\n", 1)[-1]
+            first_newline = text.find("\n")
+            if first_newline != -1:
+                text = text[first_newline + 1:]
+            else:
+                text = text[3:]
+        
+        # Удаляем закрывающую обёртку
         if text.endswith("```"):
-            text = text.rsplit("\n", 1)[0]
+            text = text[:-3]
+        
         return text.strip()
 
     async def _call_api(self, prompt: str, system_prompt: str) -> Tuple[bool, Optional[Dict], str]:
@@ -57,32 +64,41 @@ class AIConnector:
                     if resp.status == 200:
                         data = await resp.json()
                         raw = data["choices"][0]["message"]["content"]
-                        return True, json.loads(await self._clean_json(raw)), ""
+                        try:
+                            cleaned = await self._clean_json(raw)
+                            return True, json.loads(cleaned), ""
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"JSON decode failed. Raw: {raw[:200]}...")
+                            return False, None, f"AI вернул невалидный JSON: {e}"
                     elif resp.status == 429:
                         wait = 2 ** attempt
                         logger.warning(f"429. Retry {attempt+1} in {wait}s")
                         await asyncio.sleep(wait)
                     else:
-                        return False, None, f"HTTP {resp.status}: {await resp.text()}"
+                        error_text = await resp.text()
+                        return False, None, f"HTTP {resp.status}: {error_text[:300]}"
             except asyncio.TimeoutError:
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(2)
                 else:
-                    return False, None, "Timeout"
+                    return False, None, "Timeout after retries"
             except aiohttp.ClientError as e:
-                return False, None, f"Network: {e}"
+                return False, None, f"Network error: {e}"
             except Exception as e:
-                return False, None, f"Error: {e}"
-        return False, None, "Max retries"
+                logger.exception("Unexpected error in _call_api")
+                return False, None, f"Unexpected error: {type(e).__name__}: {e}"
+        
+        return False, None, "Max retries exceeded"
 
     async def generate_quiz_question(self, md_text: str) -> Tuple[bool, Dict, str]:
         system = "Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text."
-        prompt = f"Generate ONE clear quiz question and its exact correct answer based on this text:\n{md_text[:3000]}"
+        safe_text = md_text[:3000]  # защита от переполнения контекста
+        prompt = f"Generate ONE clear quiz question and its exact correct answer based on this text:\n{safe_text}"
         return await self._call_api(prompt, system)
 
     async def evaluate_answer(self, question: str, correct: str, user: str) -> Tuple[bool, Dict, str]:
         system = "Return strictly valid JSON with keys: 'correctness' (one of: 'правильно','частично','неправильно'), 'feedback' (short explanation in Russian), 'rating' (1-5)."
-        prompt = f"Question: {question}\nCorrect: {correct}\nUser: {user}\nEvaluate."
+        prompt = f"Question: {question}\nCorrect: {correct}\nUser: {user}\nEvaluate and return JSON only."
         return await self._call_api(prompt, system)
 
     async def close(self):
@@ -91,5 +107,4 @@ class AIConnector:
 
 # Синглтон для удобного импорта
 ai_client = AIConnector()
-
 
