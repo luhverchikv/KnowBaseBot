@@ -8,6 +8,7 @@ from logic.ai_connector import ai_client
 from menu.start_menu import router as menu_router
 from logic.manage.knowledge_base import router as kb_router
 from logic.quiz import router as quiz_router
+from logic.report.report_generator import router as report_router 
 
 
 async def main():
@@ -18,12 +19,12 @@ async def main():
     bot = Bot(config.bot.token)
     dp = Dispatcher()
 
-
     logger.bind(bot_id=bot.id).info("Bot instance created")
 
     dp.include_router(menu_router)
     dp.include_router(kb_router)
     dp.include_router(quiz_router)
+    dp.include_router(report_router) 
     
     try:
         logger.info("Starting bot polling")
