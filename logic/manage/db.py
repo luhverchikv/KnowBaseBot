@@ -41,9 +41,17 @@ class Database:
                     correctness    TEXT CHECK (correctness IN ('правильно','частично','неправильно')),
                     rating         INTEGER CHECK (rating BETWEEN 0 AND 5),
                     feedback       TEXT,
+                    -- ✅ Поля для токенов
+                    gen_prompt_tokens    INTEGER DEFAULT 0,
+                    gen_completion_tokens INTEGER DEFAULT 0,
+                    gen_total_tokens     INTEGER DEFAULT 0,
+                    eval_prompt_tokens   INTEGER DEFAULT 0,
+                    eval_completion_tokens INTEGER DEFAULT 0,
+                    eval_total_tokens    INTEGER DEFAULT 0,
                     FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )
             ''')
+
             
             # Индекс для ускорения запросов WHERE user_id = ?
             self.cursor.execute(
