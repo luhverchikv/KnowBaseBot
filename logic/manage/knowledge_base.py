@@ -86,14 +86,14 @@ async def cb_delete_menu(call: CallbackQuery):
     await call.answer()
     files = await asyncio.to_thread(_list_files, call.from_user.id)
     if not files:
-        await call.message.answer("📂 Ваша база знаний пуста. Загрузите файлы через раздел «Загрузить».")
+        await call.message.edit_text("📂 Ваша база знаний пуста. Загрузите файлы через раздел «Загрузить».")
         return
 
     kb = InlineKeyboardBuilder()
     for f in files:
         kb.row(InlineKeyboardButton(text=f"🗑 {f}", callback_data=f"del_confirm:{f}"))
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
-    await call.message.answer("Выберите файл для удаления:", reply_markup=kb.as_markup())
+    await call.message.edit_text("Выберите файл для удаления:", reply_markup=kb.as_markup())
 
 @router.callback_query(F.data.startswith("del_confirm:"))
 async def cb_delete_confirm(call: CallbackQuery):
@@ -105,7 +105,7 @@ async def cb_delete_confirm(call: CallbackQuery):
         InlineKeyboardButton(text="❌ Отмена", callback_data="kb_delete")
     )
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
-    await call.message.answer(
+    await call.message.edit_text(
         f"🗑 Вы уверены, что хотите удалить файл <code>{filename}</code>?",
         reply_markup=kb.as_markup(),
         parse_mode="HTML"
@@ -117,9 +117,9 @@ async def cb_delete_exec(call: CallbackQuery):
     filename = call.data.split(":", 1)[1]
     success = await asyncio.to_thread(_delete_file, call.from_user.id, filename)
     if success:
-        await call.message.answer(f"✅ Файл <code>{filename}</code> успешно удалён.", parse_mode="HTML")
+        await call.message.edit_text(f"✅ Файл <code>{filename}</code> успешно удалён.", parse_mode="HTML")
     else:
-        await call.message.answer("❌ Ошибка: файл не найден.")
+        await call.message.edit_text("❌ Ошибка: файл не найден.")
 
 @router.callback_query(F.data == "kb_view")
 async def cb_view_menu(call: CallbackQuery):
