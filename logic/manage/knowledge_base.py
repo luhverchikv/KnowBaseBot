@@ -133,7 +133,7 @@ async def cb_view_menu(call: CallbackQuery):
     for f in files:
         kb.row(InlineKeyboardButton(text=f"👁 {f}", callback_data=f"view_info:{f}"))
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
-    await call.message.answer("📄 Список файлов в вашей базе знаний:", reply_markup=kb.as_markup())
+    await call.message.edit_text("📄 Список файлов в вашей базе знаний:", reply_markup=kb.as_markup())
 
 @router.callback_query(F.data.startswith("view_info:"))
 async def cb_view_info(call: CallbackQuery):
@@ -142,14 +142,14 @@ async def cb_view_info(call: CallbackQuery):
     file_path = _get_user_dir(call.from_user.id) / filename
     if file_path.exists():
         size_mb = file_path.stat().st_size / (1024 * 1024)
-        await call.message.answer(
+        await call.message.edit_text(
             f"📄 <b>{filename}</b>\n"
             f"📦 Размер: {size_mb:.2f} МБ\n"
             f"🕒 Последнее изменение: {file_path.stat().st_mtime}",
             parse_mode="HTML"
         )
     else:
-        await call.message.answer("❌ Файл не найден.")
+        await call.message.edit_text("❌ Файл не найден.")
 
 @router.callback_query(F.data == "manage_back")
 async def cb_manage_back(call: CallbackQuery):
@@ -175,11 +175,13 @@ async def handle_document_upload(message: Message):
             f"Ваш файл: <code>{filename}</code>",
             parse_mode="HTML"
         )
+        await message.delete()
         return
     
     # 2. Проверка размера
     if doc.file_size and doc.file_size > 2 * 1024 * 1024:
         await message.answer("❌ Файл слишком большой. Максимальный размер: 2 МБ.")
+        await message.delete()
         return
 
     user_id = message.from_user.id
@@ -195,6 +197,7 @@ async def handle_document_upload(message: Message):
             "Удалите ненужные файлы через раздел «🗑️ Удалить», чтобы загрузить новые.",
             parse_mode="HTML"
         )
+        await message.delete()
         return
 
     # 4. ✅ Проверка на существование файла
@@ -210,6 +213,7 @@ async def handle_document_upload(message: Message):
             f"• Или переименуйте файл перед загрузкой",
             parse_mode="HTML"
         )
+        await message.delete()
         return
 
     # 5. Сохранение файла
@@ -222,4 +226,5 @@ async def handle_document_upload(message: Message):
         f"📊 Осталось свободных слотов: <b>{remaining}</b> из {max_files}.",
         parse_mode="HTML"
     )
+    await message.delete()
 
