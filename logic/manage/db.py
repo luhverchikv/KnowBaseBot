@@ -198,22 +198,22 @@ class Database:
                 WHERE id=?
             ''', (tokens.prompt_tokens, tokens.completion_tokens, tokens.total_tokens, question_id))
 
-    def get_token_stats(self, user_id: int, days: int = None) -> dict:
-        where = f"AND DATE(generated_at) >= DATE('now', '-{days} days')" if days else ""
-        self.cursor.execute(f'''
-            SELECT 
-                SUM(gen_total_tokens) as gen_total,
-                SUM(eval_total_tokens) as eval_total,
-                SUM(gen_total_tokens + eval_total_tokens) as grand_total
-            FROM quiz_questions 
-            WHERE user_id = ? {where}
-        ''', (user_id,))
-        row = self.cursor.fetchone()
-        return {
-            'generation': row[0] or 0,
-            'evaluation': row[1] or 0,
-            'total': row[2] or 0
-        }
+    #def get_token_stats(self, user_id: int, days: int = None) -> dict:
+        #where = f"AND DATE(generated_at) >= DATE('now', '-{days} days')" if days else ""
+        #self.cursor.execute(f'''
+            #SELECT 
+                #SUM(gen_total_tokens) as gen_total,
+                #SUM(eval_total_tokens) as eval_total,
+                #SUM(gen_total_tokens + eval_total_tokens) as grand_total
+            #FROM quiz_questions 
+            #WHERE user_id = ? {where}
+        #''', (user_id,))
+        #row = self.cursor.fetchone()
+        #return {
+            #'generation': row[0] or 0,
+            #'evaluation': row[1] or 0,
+            #'total': row[2] or 0
+        #}
     
     def get_token_stats(self, user_id: Optional[int] = None, days: int = None) -> dict:
         """
@@ -237,5 +237,4 @@ class Database:
             'evaluation': row[1] or 0,
             'total': row[2] or 0
         }
-    
     
