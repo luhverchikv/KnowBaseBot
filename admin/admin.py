@@ -74,3 +74,17 @@ async def admin_back(call: CallbackQuery):
     await call.answer()
     await call.message.delete()
 
+@router.callback_query(F.data == "admin_tokens")
+async def admin_tokens_handler(call: CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id  # или агрегируйте по всем пользователям
+    
+    stats = await asyncio.to_thread(db.get_token_stats, user_id)
+    text = (
+        f"🪙 <b>Статистика токенов</b>\n\n"
+        f"📝 Генерация вопросов: <b>{stats['generation']}</b>\n"
+        f"✅ Оценка ответов: <b>{stats['evaluation']}</b>\n"
+        f"📊 <b>Всего:</b> {stats['total']} токенов"
+    )
+    await call.message.edit_text(text, reply_markup=admin_keyboard(), parse_mode="HTML")
+
