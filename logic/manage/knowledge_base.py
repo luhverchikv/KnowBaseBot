@@ -66,6 +66,7 @@ async def handle_manage(message: Message):
         reply_markup=get_manage_keyboard().as_markup(),
         parse_mode="HTML"
     )
+    await message.delete()
 
 
 # ===================== CALLBACK HANDLERS =====================
