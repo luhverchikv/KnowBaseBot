@@ -4,6 +4,8 @@ import os
 import random
 from pathlib import Path
 from typing import Optional, List, Tuple
+from utils.logger import logger
+
 
 class Database:
     def __init__(self, path_to_database='database/database.db'):
