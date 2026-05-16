@@ -65,7 +65,8 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
         user_id,
         filename,
         qa.get("question", "?"),
-        qa.get("correct_answer", "?")
+        qa.get("correct_answer", "?"),
+        gen_tokens=gen_tokens
     )
     
     await state.update_data(
@@ -100,6 +101,9 @@ async def handle_answer(message: Message, state: FSMContext):
         await message.answer(f"❌ Оценка не удалась: {err}")
         await state.clear()
         return
+    # ✅ Сохраняем токены оценки
+    if eval_tokens:
+        await asyncio.to_thread(db.update_eval_tokens, q_id, eval_tokens)
 
     correctness = res.get("correctness", "неправильно")
     feedback = res.get("feedback", "Оценка завершена.")
