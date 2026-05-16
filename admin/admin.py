@@ -23,15 +23,14 @@ ADMIN_WELCOME = """
 """
 
 def admin_keyboard():
-    """Собирает inline-клавиатуру админ-панели."""
+    """Собирает inline-клавиатуру админ-панели (каждая кнопка в отдельном ряду)."""
     kb = InlineKeyboardBuilder()
-    kb.row(
-        InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats"),
-        InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users"),
-        InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_config"),
-        InlineKeyboardButton(text="🔙 В бот", callback_data="admin_close"),
-    )
+    kb.row(InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats"))
+    kb.row(InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users"))
+    kb.row(InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_config"))
+    kb.row(InlineKeyboardButton(text="🔙 Закрыть панель", callback_data="admin_close"))
     return kb.as_markup()
+
 
 @router.message(Command("admin"), is_owner)
 async def admin_panel(message: Message):
