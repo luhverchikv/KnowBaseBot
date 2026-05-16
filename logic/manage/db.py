@@ -125,13 +125,6 @@ class Database:
         with self.connection:
             self.cursor.execute("UPDATE quiz_questions SET rating=? WHERE id=?", (rating, question_id))
 
-    def get_user_questions(self, user_id: int, limit: int = 50) -> List[Tuple]:
-        self.cursor.execute('''
-            SELECT id, generated_at, source_file, question, correct_answer, 
-                   user_answer, correctness, rating, feedback
-            FROM quiz_questions WHERE user_id = ? ORDER BY generated_at DESC LIMIT ?
-        ''', (user_id, limit))
-        return self.cursor.fetchall()
 
     def get_user_average_rating(self, user_id: int, days: int = None) -> float:
         """Средний рейтинг пользователя (опционально за период)."""
