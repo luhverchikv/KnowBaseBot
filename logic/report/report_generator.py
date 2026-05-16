@@ -14,8 +14,11 @@ db = Database()
 def report_keyboard():
     """Собирает inline-клавиатуру для раздела «Анализ»."""
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="📊 Общая статистика", callback_data="report_overall"))
-    kb.row(InlineKeyboardButton(text="📅 За неделю", callback_data="report_week"))
+    kb.row(
+        InlineKeyboardButton(text="📊 За сутки", callback_data="report_day"),
+        InlineKeyboardButton(text="📅 За неделю", callback_data="report_week")
+    )
+    kb.row(InlineKeyboardButton(text="📈 За всё время", callback_data="report_overall"))
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="report_back"))
     return kb.as_markup()
 
@@ -58,11 +61,12 @@ async def get_user_stats(user_id: int, days: int = None) -> dict:
         """, (user_id,))
         top_files = db.cursor.fetchall()
         
-        # Динамика по дням (последние 7 дней)
+        # Динамика по дням (последние 7 дней или меньше, если период короче)
+        limit_days = min(days, 7) if days else 7
         db.cursor.execute(f"""
             SELECT DATE(generated_at) as day, COUNT(*) as cnt, AVG(rating) as avg_r
             FROM quiz_questions 
-            WHERE user_id = ? AND DATE(generated_at) >= DATE('now', '-7 days')
+            WHERE user_id = ? AND DATE(generated_at) >= DATE('now', '-{limit_days} days')
             GROUP BY day 
             ORDER BY day
         """, (user_id,))
@@ -114,8 +118,8 @@ def format_stats_text(stats: dict, period: str = "всё время") -> str:
     
     # Мини-график динамики (текстовый)
     if stats['daily'] and len(stats['daily']) > 1:
-        text += f"\n📅 <b>Динамика (7 дней):</b>\n"
-        for day, cnt, avg_r in stats['daily'][-7:]:
+        text += f"\n📅 <b>Динамика:</b>\n"
+        for day, cnt, avg_r in stats['daily']:
             bar = "█" * min(cnt, 10)
             text += f"• {day}: {bar} ({cnt}, ср. {avg_r or 0:.1f}⭐)\n"
     
@@ -132,12 +136,12 @@ async def report_menu(message: Message):
         parse_mode="HTML"
     )
 
-@router.callback_query(F.data == "report_overall")
-async def report_overall(call: CallbackQuery):
-    """Показывает статистику за всё время."""
+@router.callback_query(F.data == "report_day")
+async def report_day(call: CallbackQuery):
+    """Показывает статистику за последние 24 часа."""
     await call.answer()
-    stats = await get_user_stats(call.from_user.id)
-    text = format_stats_text(stats, "всё время")
+    stats = await get_user_stats(call.from_user.id, days=1)
+    text = format_stats_text(stats, "за сутки")
     await call.message.answer(text, reply_markup=back_to_menu_keyboard(), parse_mode="HTML")
 
 @router.callback_query(F.data == "report_week")
@@ -148,11 +152,18 @@ async def report_week(call: CallbackQuery):
     text = format_stats_text(stats, "за неделю")
     await call.message.answer(text, reply_markup=back_to_menu_keyboard(), parse_mode="HTML")
 
+@router.callback_query(F.data == "report_overall")
+async def report_overall(call: CallbackQuery):
+    """Показывает статистику за всё время."""
+    await call.answer()
+    stats = await get_user_stats(call.from_user.id)
+    text = format_stats_text(stats, "всё время")
+    await call.message.answer(text, reply_markup=back_to_menu_keyboard(), parse_mode="HTML")
+
 @router.callback_query(F.data == "report_back")
 async def report_back(call: CallbackQuery):
     """Возврат в главное меню."""
     await call.answer()
-    # Отправляем текст главного меню с основной клавиатурой
     from menu.start_menu import start_text, start_keyboard
     await call.message.edit_text(
         text=start_text,
