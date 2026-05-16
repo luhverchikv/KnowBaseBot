@@ -26,7 +26,7 @@ def setup_logging():
     
     # Лог ошибок в файл (JSON формат)
     logger.add(
-        'database/errors.log',
+        'logs/errors.log',
         format=json_formatter,
         level="ERROR",
         rotation="1 month",
@@ -36,7 +36,7 @@ def setup_logging():
     
     # Лог информации в файл (JSON формат)
     logger.add(
-        'database/info.log',
+        'logs/info.log',
         format=json_formatter,
         level="INFO",
         rotation="1 month",
@@ -54,7 +54,7 @@ def setup_logging():
     
     # Дополнительный debug лог для разработки
     logger.add(
-        'database/debug.log',
+        'logs/debug.log',
         format=json_formatter,
         level="DEBUG",
         rotation="1 week",
