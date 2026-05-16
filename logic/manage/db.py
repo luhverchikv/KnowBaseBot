@@ -133,3 +133,34 @@ class Database:
         ''', (user_id, limit))
         return self.cursor.fetchall()
 
+    def get_user_average_rating(self, user_id: int, days: int = None) -> float:
+        """Средний рейтинг пользователя (опционально за период)."""
+        where = f"AND DATE(generated_at) >= DATE('now', '-{days} days')" if days else ""
+        self.cursor.execute(f"""
+            SELECT AVG(rating) FROM quiz_questions 
+            WHERE user_id = ? AND rating IS NOT NULL {where}
+        """, (user_id,))
+        result = self.cursor.fetchone()[0]
+        return round(result, 2) if result else 0.0
+
+    def get_correctness_distribution(self, user_id: int, days: int = None) -> dict:
+        """Распределение ответов по типам (правильно/частично/неправильно)."""
+        where = f"AND DATE(generated_at) >= DATE('now', '-{days} days')" if days else ""
+        self.cursor.execute(f"""
+            SELECT 
+                SUM(CASE WHEN correctness='правильно' THEN 1 ELSE 0 END) as correct,
+                SUM(CASE WHEN correctness='частично' THEN 1 ELSE 0 END) as partial,
+                SUM(CASE WHEN correctness='неправильно' THEN 1 ELSE 0 END) as wrong,
+                COUNT(*) as total
+            FROM quiz_questions 
+            WHERE user_id = ? {where}
+        """, (user_id,))
+        row = self.cursor.fetchone()
+        total = row[3] or 1  # избегаем деления на 0
+        return {
+            'correct_pct': round((row[0] or 0) / total * 100),
+            'partial_pct': round((row[1] or 0) / total * 100),
+            'wrong_pct': round((row[2] or 0) / total * 100),
+            'total': total
+        }
+
