@@ -32,7 +32,6 @@ async def quiz_menu(message: Message):
     )
 
 # logic/quiz.py (фрагменты с исправлениями)
-
 @router.callback_query(F.data == "quiz_generate")
 async def handle_generate(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -63,11 +62,12 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
         await call.message.answer(f"❌ AI ошибка: {err}")
         return
 
+    # ✅ ИСПРАВЛЕНО: передаём gen_tokens
     q_id = await asyncio.to_thread(
         db.add_quiz_question,
         user_id, filename,
         qa.get("question", "?"), qa.get("correct_answer", "?"),
-        gen_tokens=gen_tokens  # ✅ Передаём токены генерации
+        gen_tokens=gen_tokens
     )
     
     await state.update_data(
@@ -77,7 +77,7 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     )
     await state.set_state(QuizStates.waiting_answer)
     
-    kb = InlineKeyboardBuilder().row(InlineKeyboardButton(text=" Отмена", callback_data="quiz_cancel"))
+    kb = InlineKeyboardBuilder().row(InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel"))
     await call.message.answer(
         f"❓ <b>Вопрос:</b>\n{qa.get('question', '?')}\n\nНапишите ответ:",
         reply_markup=kb.as_markup(),
@@ -105,7 +105,7 @@ async def handle_answer(message: Message, state: FSMContext):
     feedback = res.get("feedback", "Оценка завершена.")
     rating = res.get("rating", 3)
 
-    # ✅ Сохраняем токены оценки (если они есть)
+    # ✅ ИСПРАВЛЕНО: сохраняем токены оценки
     if eval_tokens:
         await asyncio.to_thread(db.update_eval_tokens, q_id, eval_tokens)
 
@@ -113,7 +113,7 @@ async def handle_answer(message: Message, state: FSMContext):
     await asyncio.to_thread(db.update_quiz_rating, q_id, rating)
     await state.clear()
 
-    emoji = {"правильно": "✅", "частично": "🔶", "неправильно": ""}.get(correctness, "❓")
+    emoji = {"правильно": "✅", "частично": "🔶", "неправильно": "❌"}.get(correctness, "❓")
     stars = "⭐" * rating + "☆" * (5 - rating)
     
     await message.answer(
