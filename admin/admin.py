@@ -48,7 +48,7 @@ async def admin_denied(message: Message):
     await message.answer("🔒 Доступ запрещён. Эта команда доступна только владельцу бота.")
 
 @router.callback_query(F.data == "admin_close", is_owner)
-async def admin_back(call: CallbackQuery, is_owner):
+async def admin_back(call: CallbackQuery):
     await call.answer()
     await call.message.delete()
 
