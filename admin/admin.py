@@ -49,7 +49,7 @@ async def admin_panel(message: Message):
     unread = await asyncio.to_thread(db.get_unread_feedback_count)
     await message.answer(
         text=ADMIN_WELCOME,
-        reply_markup=admin_keyboard(),
+        reply_markup=admin_keyboard(unread),
         parse_mode="HTML"
     )
     await message.delete()
