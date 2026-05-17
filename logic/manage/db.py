@@ -270,7 +270,7 @@ class Database:
             # Если колонки max_file_size_mb ещё нет в БД, вернём дефолты
             pass
         return {"max_files": 3, "max_file_size_mb": 0.25, "max_questions_per_day": 3}
-
+    
 
     def update_user_limit(self, user_id: int, field: str, value) -> bool:
         """
@@ -290,4 +290,4 @@ class Database:
                 (value, user_id)
             )
             return self.cursor.rowcount > 0
-
+    
