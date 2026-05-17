@@ -240,3 +240,35 @@ class Database:
         """, (limit, offset))
         return self.cursor.fetchall()
 
+    def get_user_total_questions(self, user_id: int) -> int:
+        """Возвращает общее количество сгенерированных вопросов для пользователя."""
+        self.cursor.execute("SELECT COUNT(*) FROM quiz_questions WHERE user_id = ?", (user_id,))
+        return self.cursor.fetchone()[0]
+
+    def get_user_files_count(self, user_id: int) -> int:
+        """Считает количество .md файлов в директории пользователя."""
+        user_dir = Path("database") / str(user_id)
+        if not user_dir.exists():
+            return 0
+        return sum(1 for f in user_dir.iterdir() if f.is_file() and f.suffix.lower() in {".md", ".markdown"})
+
+    def get_user_limits(self, user_id: int) -> dict:
+        """Возвращает текущие лимиты пользователя (безопасно для старых схем БД)."""
+        try:
+            self.cursor.execute(
+                "SELECT max_files, max_file_size_mb, max_questions_per_day FROM users WHERE user_id = ?", 
+                (user_id,)
+            )
+            row = self.cursor.fetchone()
+            if row:
+                return {
+                    "max_files": row[0],
+                    "max_file_size_mb": row[1],
+                    "max_questions_per_day": row[2]
+                }
+        except sqlite3.OperationalError:
+            # Если колонки max_file_size_mb ещё нет в БД, вернём дефолты
+            pass
+        return {"max_files": 3, "max_file_size_mb": 0.25, "max_questions_per_day": 3}
+
+
