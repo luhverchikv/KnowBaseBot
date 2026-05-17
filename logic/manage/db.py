@@ -54,22 +54,30 @@ class Database:
                     FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )
             ''')
-            
             # Индекс для ускорения запросов WHERE user_id = ?
             self.cursor.execute(
                 'CREATE INDEX IF NOT EXISTS idx_quiz_user_id ON quiz_questions(user_id)'
             )
-            # В __init__, после создания quiz_questions:
+            
+            
+            # 3. Таблица отзывов
             self.cursor.execute('''
                 CREATE TABLE IF NOT EXISTS feedback (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     feedback_text TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    is_read INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )
             ''')
-            self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id)')
+            self.cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id)'
+            )
+            self.cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at)'
+            )
+
 
 
 
@@ -303,13 +311,43 @@ class Database:
             )
             return self.cursor.rowcount > 0
     
-
+    
+# ======== методы работы с отзывами =======
     def save_feedback(self, user_id: int, feedback_text: str) -> int:
-        """Сохраняет отзыв пользователя в БД."""
+        """Сохраняет отзыв пользователя."""
         with self.connection:
-            self.cursor.execute('''
-                INSERT INTO feedback (user_id, feedback_text, created_at)
-                VALUES (?, ?, datetime('now'))
-            ''', (user_id, feedback_text))
+            self.cursor.execute(
+                "INSERT INTO feedback (user_id, feedback_text) VALUES (?, ?)",
+                (user_id, feedback_text)
+            )
             return self.cursor.lastrowid
+
+    def get_feedback_paginated(self, limit: int = 10, offset: int = 0, only_unread: bool = False) -> list[tuple]:
+        """Возвращает список отзывов с пагинацией."""
+        filter_clause = "WHERE is_read = 0" if only_unread else ""
+        self.cursor.execute(f'''
+            SELECT f.id, f.user_id, f.feedback_text, f.created_at, u.user_id as tg_id
+            FROM feedback f
+            LEFT JOIN users u ON f.user_id = u.id
+            {filter_clause}
+            ORDER BY f.created_at DESC
+            LIMIT ? OFFSET ?
+        ''', (limit, offset))
+        return self.cursor.fetchall()
+
+    def get_unread_feedback_count(self) -> int:
+        """Считает количество непрочитанных отзывов."""
+        self.cursor.execute("SELECT COUNT(*) FROM feedback WHERE is_read = 0")
+        return self.cursor.fetchone()[0]
+
+    def mark_feedback_read(self, feedback_id: int) -> None:
+        """Помечает отзыв как прочитанный."""
+        with self.connection:
+            self.cursor.execute("UPDATE feedback SET is_read = 1 WHERE id = ?", (feedback_id,))
+
+    def delete_feedback(self, feedback_id: int) -> bool:
+        """Удаляет отзыв по ID."""
+        with self.connection:
+            self.cursor.execute("DELETE FROM feedback WHERE id = ?", (feedback_id,))
+            return self.cursor.rowcount > 0
 
