@@ -10,7 +10,7 @@ from logic.manage.knowledge_base import router as kb_router
 from logic.quiz import router as quiz_router
 from logic.report.report_generator import router as report_router 
 from admin.admin import router as admin_router
-
+from logic.feedback import router as feedback_router
 
 async def main():
     
@@ -27,6 +27,7 @@ async def main():
     dp.include_router(quiz_router)
     dp.include_router(report_router) 
     dp.include_router(admin_router) 
+    dp.include_router(feedback_router)
     
     try:
         logger.info("Starting bot polling")
