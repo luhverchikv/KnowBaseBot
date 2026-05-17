@@ -25,6 +25,7 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, 
                     user_id INTEGER UNIQUE NOT NULL,
                     max_files              INTEGER NOT NULL DEFAULT 3,
+                     max_file_size_mb        REAL    NOT NULL DEFAULT 0.25,
                     max_questions_per_day  INTEGER NOT NULL DEFAULT 3,
                     reminders              INTEGER NOT NULL DEFAULT 0
                 )
