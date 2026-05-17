@@ -102,7 +102,7 @@ def format_stats_text(stats: dict, period: str = "всё время") -> str:
     text = (
         f"📊 <b>Статистика ({period})</b>\n\n"
         f"📈 <b>Общие показатели:</b>\n"
-        f"• Всего ответов: <b>{total}</b>\n"
+        f"• Всего вопросов: <b>{total}</b>\n"
         f"• Средний балл: <b>{avg}/5</b> {stars}\n\n"
         f"🎯 <b>Точность:</b>\n"
         f"• ✅ Правильно: <b>{stats['correct']}</b> ({correct_pct}%)\n"
