@@ -272,3 +272,22 @@ class Database:
         return {"max_files": 3, "max_file_size_mb": 0.25, "max_questions_per_day": 3}
 
 
+    def update_user_limit(self, user_id: int, field: str, value) -> bool:
+        """
+        Обновляет один лимит пользователя.
+        :param field: имя поля ('max_files', 'max_file_size_mb', 'max_questions_per_day')
+        :param value: новое значение
+        :return: True при успехе
+        """
+        # Валидация имени поля (защита от SQL-инъекций)
+        allowed_fields = {'max_files', 'max_file_size_mb', 'max_questions_per_day'}
+        if field not in allowed_fields:
+            return False
+        
+        with self.connection:
+            self.cursor.execute(
+                f"UPDATE users SET {field} = ? WHERE user_id = ?",
+                (value, user_id)
+            )
+            return self.cursor.rowcount > 0
+
