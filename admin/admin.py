@@ -14,7 +14,7 @@ from utils.numeric_keyboard import numeric_keyboard
 router = Router()
 db = Database()
 USERS_PER_PAGE = 10
-
+FEEDBACK_PER_PAGE = 5
 
 # Текст приветствия администратора
 ADMIN_WELCOME = """
@@ -30,11 +30,13 @@ ADMIN_WELCOME = """
 Выберите действие ниже или введите команду:
 """
 
-def admin_keyboard():
+def admin_keyboard(unread_count: int = 0):
     """Собирает inline-клавиатуру админ-панели (каждая кнопка в отдельном ряду)."""
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats"))
     kb.row(InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users"))
+    feedback_text = f"💬 Отзывы" + (f" ({unread_count})" if unread_count > 0 else "")
+    kb.row(InlineKeyboardButton(text=feedback_text, callback_data="admin_feedback"))
     kb.row(InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_config"))
     kb.row(InlineKeyboardButton(text="🪙 Токены за сутки", callback_data="admin_tokens_day"))
     kb.row(InlineKeyboardButton(text="🔙 Закрыть панель", callback_data="admin_close"))
@@ -44,6 +46,7 @@ def admin_keyboard():
 @router.message(Command("admin"), is_owner)
 async def admin_panel(message: Message):
     """Точка входа в админ-панель (только для owner_id)."""
+    unread = await asyncio.to_thread(db.get_unread_feedback_count)
     await message.answer(
         text=ADMIN_WELCOME,
         reply_markup=admin_keyboard(),
@@ -379,4 +382,135 @@ async def admin_numeric_input_handler(call: CallbackQuery, state: FSMContext):
         ),
         parse_mode="HTML"
     )
+
+
+@router.callback_query(F.data == "admin_feedback", is_owner)
+async def admin_feedback_list(call: CallbackQuery):
+    """Список отзывов с пагинацией."""
+    await call.answer()
+    await _show_feedback_page(call, page=0)
+
+async def _show_feedback_page(call: CallbackQuery, page: int):
+    """Внутренняя функция для отображения страницы отзывов."""
+    offset = page * FEEDBACK_PER_PAGE
+    feedbacks = await asyncio.to_thread(db.get_feedback_paginated, limit=FEEDBACK_PER_PAGE, offset=offset)
+    total = await asyncio.to_thread(db.get_unread_feedback_count)  # можно заменить на общий счётчик
+    
+    if not feedbacks:
+        await call.message.edit_text(
+            "📭 <b>Отзывов пока нет.</b>\n\n"
+            "Как только пользователи напишут — они появятся здесь.",
+            reply_markup=admin_keyboard(),
+            parse_mode="HTML"
+        )
+        return
+    
+    # Формируем текст с отзывами
+    text = f"💬 <b>Отзывы (стр. {page + 1})</b>\n\n"
+    for fb_id, user_db_id, fb_text, created_at, tg_id in feedbacks:
+        # tg_id может быть None, если пользователь удалён из users
+        display_id = tg_id if tg_id else f"user_{user_db_id}"
+        preview = fb_text[:100] + ("..." if len(fb_text) > 100 else "")
+        text += f"👤 <code>{display_id}</code> • <i>{created_at}</i>\n{preview}\n\n"
+    
+    # Кнопки навигации
+    kb = InlineKeyboardBuilder()
+    for fb_id, user_db_id, fb_text, created_at, tg_id in feedbacks:
+        kb.row(InlineKeyboardButton(
+            text=f"👁 {tg_id or f'user_{user_db_id}'}",
+            callback_data=f"feedback_view:{fb_id}"
+        ))
+    
+    # Пагинация
+    if feedbacks:
+        kb.row(
+            InlineKeyboardButton(text="◀️", callback_data=f"feedback_page:{max(0, page-1)}") if page > 0 else None,
+            InlineKeyboardButton(text=f"📄 {page+1}", callback_data="noop"),
+            InlineKeyboardButton(text="▶️", callback_data=f"feedback_page:{page+1}") if len(feedbacks) == FEEDBACK_PER_PAGE else None
+        )
+    
+    kb.row(InlineKeyboardButton(text="🔙 В меню админа", callback_data="admin_back_to_menu"))
+    
+    await call.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+
+@router.callback_query(F.data.startswith("feedback_page:"), is_owner)
+async def admin_feedback_page_change(call: CallbackQuery):
+    """Переключение страницы отзывов."""
+    await call.answer()
+    try:
+        page = int(call.data.split(":")[1])
+    except (IndexError, ValueError):
+        page = 0
+    await _show_feedback_page(call, page)
+
+@router.callback_query(F.data.startswith("feedback_view:"), is_owner)
+async def admin_feedback_view(call: CallbackQuery):
+    """Просмотр полного текста отзыва."""
+    await call.answer()
+    try:
+        fb_id = int(call.data.split(":")[1])
+    except (IndexError, ValueError):
+        await call.answer("❌ Ошибка ID", show_alert=True)
+        return
+    
+    # Получаем полный отзыв
+    db.cursor.execute(
+        "SELECT user_id, feedback_text, created_at, is_read FROM feedback WHERE id = ?",
+        (fb_id,)
+    )
+    row = db.cursor.fetchone()
+    if not row:
+        await call.answer("❌ Отзыв не найден", show_alert=True)
+        return
+    
+    user_db_id, fb_text, created_at, is_read = row
+    
+    # Помечаем как прочитанный, если ещё нет
+    if not is_read:
+        await asyncio.to_thread(db.mark_feedback_read, fb_id)
+    
+    # Кнопки действий
+    kb = InlineKeyboardBuilder()
+    kb.row(
+        InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"feedback_delete:{fb_id}"),
+        InlineKeyboardButton(text="🔙 Назад", callback_data="admin_feedback")
+    )
+    
+    await call.message.edit_text(
+        f"💬 <b>Полный отзыв</b>\n\n"
+        f"👤 User DB ID: <code>{user_db_id}</code>\n"
+        f"🕒 Дата: <i>{created_at}</i>\n\n"
+        f"📝 <b>Текст:</b>\n<code>{fb_text}</code>",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@router.callback_query(F.data.startswith("feedback_delete:"), is_owner)
+async def admin_feedback_delete(call: CallbackQuery):
+    """Удаление отзыва."""
+    await call.answer()
+    try:
+        fb_id = int(call.data.split(":")[1])
+    except (IndexError, ValueError):
+        return
+    
+    success = await asyncio.to_thread(db.delete_feedback, fb_id)
+    if success:
+        await call.answer("✅ Отзыв удалён", show_alert=True)
+        # Возвращаемся к списку
+        await _show_feedback_page(call, page=0)
+    else:
+        await call.answer("❌ Не удалось удалить", show_alert=True)
+
+@router.callback_query(F.data == "admin_back_to_menu", is_owner)
+async def admin_back_to_menu(call: CallbackQuery):
+    """Возврат в главное меню админки."""
+    await call.answer()
+    unread = await asyncio.to_thread(db.get_unread_feedback_count)
+    await call.message.edit_text(
+        text=ADMIN_WELCOME,
+        reply_markup=admin_keyboard(unread),
+        parse_mode="HTML"
+    )
+
 
