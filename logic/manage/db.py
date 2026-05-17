@@ -54,12 +54,24 @@ class Database:
                     FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )
             ''')
-
             
             # Индекс для ускорения запросов WHERE user_id = ?
             self.cursor.execute(
                 'CREATE INDEX IF NOT EXISTS idx_quiz_user_id ON quiz_questions(user_id)'
             )
+            # В __init__, после создания quiz_questions:
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    feedback_text TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                )
+            ''')
+            self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id)')
+
+
 
     # ===================== USERS =====================
     def user_exists(self, user_id: int) -> bool:
@@ -291,3 +303,13 @@ class Database:
             )
             return self.cursor.rowcount > 0
     
+
+    def save_feedback(self, user_id: int, feedback_text: str) -> int:
+        """Сохраняет отзыв пользователя в БД."""
+        with self.connection:
+            self.cursor.execute('''
+                INSERT INTO feedback (user_id, feedback_text, created_at)
+                VALUES (?, ?, datetime('now'))
+            ''', (user_id, feedback_text))
+            return self.cursor.lastrowid
+
