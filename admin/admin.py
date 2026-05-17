@@ -422,16 +422,22 @@ async def _show_feedback_page(call: CallbackQuery, page: int):
         ))
     
     # Пагинация
-    if feedbacks:
-        kb.row(
-            InlineKeyboardButton(text="◀️", callback_data=f"feedback_page:{max(0, page-1)}") if page > 0 else None,
-            InlineKeyboardButton(text=f"📄 {page+1}", callback_data="noop"),
-            InlineKeyboardButton(text="▶️", callback_data=f"feedback_page:{page+1}") if len(feedbacks) == FEEDBACK_PER_PAGE else None
-        )
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton(text="◀️", callback_data=f"feedback_page:{page-1}"))
+    
+    nav_buttons.append(InlineKeyboardButton(text=f"📄 {page+1}", callback_data="noop"))
+    
+    if len(feedbacks) == FEEDBACK_PER_PAGE:
+        nav_buttons.append(InlineKeyboardButton(text="▶️", callback_data=f"feedback_page:{page+1}"))
+    
+    if nav_buttons:  # Добавляем ряд только если есть кнопки навигации
+        kb.row(*nav_buttons)
     
     kb.row(InlineKeyboardButton(text="🔙 В меню админа", callback_data="admin_back_to_menu"))
     
     await call.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+
 
 @router.callback_query(F.data.startswith("feedback_page:"), is_owner)
 async def admin_feedback_page_change(call: CallbackQuery):
