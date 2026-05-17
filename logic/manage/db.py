@@ -231,4 +231,12 @@ class Database:
         result = self.cursor.fetchone()
         return result[0] if result else 0.25
         
-        
+    def get_users_paginated(self, limit: int = 10, offset: int = 0) -> list[tuple]:
+        """Возвращает список user_id пользователей с пагинацией, отсортированный по возрастанию."""
+        self.cursor.execute("""
+            SELECT user_id FROM users 
+            ORDER BY user_id ASC 
+            LIMIT ? OFFSET ?
+        """, (limit, offset))
+        return self.cursor.fetchall()
+
