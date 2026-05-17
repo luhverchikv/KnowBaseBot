@@ -39,7 +39,7 @@ def admin_keyboard(unread_count: int = 0):
     kb.row(InlineKeyboardButton(text=feedback_text, callback_data="admin_feedback"))
     kb.row(InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_config"))
     kb.row(InlineKeyboardButton(text="🪙 Токены за сутки", callback_data="admin_tokens_day"))
-    kb.row(InlineKeyboardButton(text="🔙 Закрыть панель", callback_data="admin_close"))
+    kb.row(InlineKeyboardButton(text="❌ Закрыть панель", callback_data="admin_close"))
     return kb.as_markup()
 
 
