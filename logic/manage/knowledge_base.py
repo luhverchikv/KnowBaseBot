@@ -73,10 +73,12 @@ async def handle_manage(message: Message):
 @router.callback_query(F.data == "kb_upload")
 async def cb_upload(call: CallbackQuery):
     await call.answer()
+    user_id = call.message.from_user.id
+    max_size_mb = await asyncio.to_thread(db.get_user_max_file_size, user_id)
     await call.message.edit_text(
         "📤 <b>Загрузка файла</b>\n\n"
         "Отправьте файл (markdown).\n"
-        "Максимальный размер: 2 МБ.\n"
+        f"Максимальный размер: {max_size_mb} МБ.\n"
         "Файл будет сохранён в вашу личную базу знаний.",
         parse_mode="HTML"
     )
