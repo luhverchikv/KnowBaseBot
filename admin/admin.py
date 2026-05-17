@@ -147,3 +147,39 @@ async def noop_handler(call: CallbackQuery):
     """Заглушка для клика по индикатору страницы (чтобы Telegram не ругался)."""
     await call.answer()
     
+
+@router.callback_query(F.data.startswith("admin_user_info:"), is_owner)
+async def admin_user_info_handler(call: CallbackQuery):
+    """Отображает детальную статистику и лимиты выбранного пользователя."""
+    await call.answer()
+    
+    # Извлекаем user_id из callback_data
+    try:
+        user_id = int(call.data.split(":")[1])
+    except (IndexError, ValueError):
+        await call.message.answer("❌ Ошибка: некорректный ID пользователя.")
+        return
+
+    # Асинхронно собираем данные
+    token_stats = await asyncio.to_thread(db.get_token_stats, user_id)
+    total_questions = await asyncio.to_thread(db.get_user_total_questions, user_id)
+    files_count = await asyncio.to_thread(db.get_user_files_count, user_id)
+    limits = await asyncio.to_thread(db.get_user_limits, user_id)
+
+    text = (
+        f"👤 <b>Профиль пользователя: {user_id}</b>\n\n"
+        f"📊 <b>Статистика (всё время):</b>\n"
+        f"• 🪙 Токенов использовано: <b>{token_stats['total']:,}</b>\n"
+        f"• ❓ Вопросов сгенерировано: <b>{total_questions}</b>\n"
+        f"• 📁 Файлов загружено: <b>{files_count}</b>\n\n"
+        f"⚙️ <b>Текущие лимиты:</b>\n"
+        f"• Вопросов/день: <b>{limits['max_questions_per_day']}</b>\n"
+        f"• Макс. файлов: <b>{limits['max_files']}</b>\n"
+        f"• Макс. размер файла: <b>{limits['max_file_size_mb']} МБ</b>"
+    )
+
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="✏️ Редактировать лимиты", callback_data=f"admin_edit_limits:{user_id}"))
+    kb.row(InlineKeyboardButton(text="🔙 В меню админа", callback_data="admin_back_to_menu"))
+
+    await call.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
