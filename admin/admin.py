@@ -200,7 +200,7 @@ class LimitEditStates(StatesGroup):
 
 # ... внутри admin.py, после существующих хендлеров ...
 
-@router.callback_query(F.data == "admin_edit_limits", is_owner)
+@router.callback_query(F.data.startswith("admin_edit_limits"), is_owner)
 async def admin_edit_limits_start(call: CallbackQuery, state: FSMContext):
     """Начало редактирования лимитов: выбор категории."""
     await call.answer()
