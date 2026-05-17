@@ -165,6 +165,7 @@ async def cb_manage_back(call: CallbackQuery):
 async def handle_document_upload(message: Message):
     doc = message.document
     filename = doc.file_name or "unknown"
+    user_id = message.from_user.id
     
     # ✅ 1. Проверка расширения файла
     _, ext = os.path.splitext(filename.lower())
@@ -178,13 +179,26 @@ async def handle_document_upload(message: Message):
         await message.delete()
         return
     
+    
+    
+    # ✅ Получаем лимит из БД (в МБ)
+    max_size_mb = await asyncio.to_thread(db.get_user_max_file_size, user_id)
+    # Переводим МБ в байты (1 МБ = 1024 * 1024 байт)
+    max_size_bytes = max_size_mb * 1024 * 1024
+
     # 2. Проверка размера
-    if doc.file_size and doc.file_size > 2 * 1024 * 1024:
-        await message.answer("❌ Файл слишком большой. Максимальный размер: 2 МБ.")
+    if doc.file_size and doc.file_size > max_size_bytes:
+        # ✅ Выводим пользователю актуальный лимит
+        await message.answer(
+            f"❌ Файл слишком большой.\n"
+            f"Ваш лимит: <b>{max_size_mb} МБ</b>.\n"
+            f"Размер файла: {doc.file_size / (1024 * 1024):.2f} МБ",
+            parse_mode="HTML"
+        )
         await message.delete()
         return
 
-    user_id = message.from_user.id
+    
     
     # 3. Проверка лимита файлов
     max_files = await asyncio.to_thread(db.get_user_max_files, user_id)
