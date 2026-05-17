@@ -48,6 +48,8 @@ async def feedback_cancel(call: CallbackQuery, state: FSMContext):
     await call.message.edit_text("✏️ Ввод отзыва отменён. Возвращаемся в меню.")
 
 
+# logic/feedback.py (внутри feedback_received)
+
 @router.message(FeedbackStates.waiting_feedback)
 async def feedback_received(message: Message, state: FSMContext):
     """Получение текста отзыва от пользователя."""
@@ -58,21 +60,14 @@ async def feedback_received(message: Message, state: FSMContext):
         return
     
     user_id = message.from_user.id
-    username = message.from_user.username or f"user_{user_id}"
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # ✅ Логируем отзыв (можно расширить: сохранять в БД, отправлять админу и т.д.)
-    log_entry = f"[{timestamp}] FEEDBACK from @{username} (ID:{user_id}):\n{feedback_text}\n" + "-"*60 + "\n"
+    # ✅ Сохраняем в БД
+    await asyncio.to_thread(db.save_feedback, user_id, feedback_text)
     
-    # Запись в файл логов отзывов
-    try:
-        with open("logs/feedback.log", "a", encoding="utf-8") as f:
-            f.write(log_entry)
-        logger.info(f"Feedback received from user {user_id}")
-    except Exception as e:
-        logger.error(f"Failed to save feedback: {e}")
+    # Логируем (опционально)
+    logger.info(f"Feedback saved from user {user_id}: {feedback_text[:100]}...")
     
-    # ✅ Отправляем подтверждение пользователю
+    # ✅ Отправляем подтверждение
     await message.answer(
         "✅ <b>Спасибо за ваш отзыв!</b>\n\n"
         "Ваше сообщение успешно отправлено разработчикам.\n"
@@ -82,4 +77,3 @@ async def feedback_received(message: Message, state: FSMContext):
     )
     
     await state.clear()
-
