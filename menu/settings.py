@@ -36,6 +36,7 @@ async def settings_menu(message: Message):
         reply_markup=settings_keyboard(),
         parse_mode="HTML"
     )
+    await message.delete()
 
 @router.callback_query(F.data == "settings_difficulty")
 async def settings_difficulty(call: CallbackQuery):
