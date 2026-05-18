@@ -9,7 +9,7 @@ from config import config  # ✅ Для доступа к owner_id
 from utils.logger import logger
 
 def setup_reminder_scheduler(bot: Bot) -> AsyncIOScheduler:
-    tz = zoneinfo.ZoneInfo("Europe/Moscow")  # Укажите ваш часовой пояс
+    tz = zoneinfo.ZoneInfo("Europe/Minsk")  # Укажите ваш часовой пояс
     scheduler = AsyncIOScheduler(timezone=tz)
     
     # 🌅 Утреннее напоминание пользователям (9:00)
