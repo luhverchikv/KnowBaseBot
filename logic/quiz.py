@@ -40,7 +40,7 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     
     max_q = await asyncio.to_thread(db.get_max_questions_per_day, user_id)
     if await asyncio.to_thread(db.get_daily_questions_count, user_id) >= max_q:
-        await call.message.edit_text(f"❌ Лимит ({max_q}) исчерпан. Возвращайтесь завтра!")
+        await call.message.answer(f"❌ Лимит ({max_q}) исчерпан. Возвращайтесь завтра!")
         return
 
     filename = await asyncio.to_thread(db.get_random_user_file, user_id)
@@ -80,7 +80,7 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     await state.set_state(QuizStates.waiting_answer)
     
     kb = InlineKeyboardBuilder().row(InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel"))
-    await call.message.edit_text(
+    await call.message.answer(
         f"❓ <b>Вопрос:</b>\n{qa.get('question', '?')}\n\nНапишите ответ:",
         reply_markup=kb.as_markup(),
         parse_mode="HTML"
