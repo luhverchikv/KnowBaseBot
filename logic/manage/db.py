@@ -25,9 +25,10 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, 
                     user_id INTEGER UNIQUE NOT NULL,
                     max_files              INTEGER NOT NULL DEFAULT 3,
-                     max_file_size_mb        REAL    NOT NULL DEFAULT 0.25,
+                    max_file_size_mb        REAL    NOT NULL DEFAULT 0.25,
                     max_questions_per_day  INTEGER NOT NULL DEFAULT 3,
-                    reminders              INTEGER NOT NULL DEFAULT 0
+                    reminders              INTEGER NOT NULL DEFAULT 0,
+                     difficulty             TEXT    NOT NULL DEFAULT 'medium' CHECK(difficulty IN ('easy', 'medium', 'hard'))
                 )
             ''')
 
@@ -350,4 +351,17 @@ class Database:
         with self.connection:
             self.cursor.execute("DELETE FROM feedback WHERE id = ?", (feedback_id,))
             return self.cursor.rowcount > 0
+
+    def get_user_difficulty(self, user_id: int) -> str:
+        """Возвращает уровень сложности пользователя."""
+        self.cursor.execute("SELECT difficulty FROM users WHERE user_id = ?", (user_id,))
+        res = self.cursor.fetchone()
+        return res[0] if res else 'medium'
+
+    def set_user_difficulty(self, user_id: int, difficulty: str) -> None:
+        """Обновляет уровень сложности пользователя."""
+        if difficulty not in ('easy', 'medium', 'hard'):
+            difficulty = 'medium'
+        with self.connection:
+            self.cursor.execute("UPDATE users SET difficulty = ? WHERE user_id = ?", (difficulty, user_id))
 
