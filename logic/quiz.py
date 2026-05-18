@@ -56,8 +56,9 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
         return
 
     await call.message.answer("⏳ Генерирую вопрос...")
-    # ✅ ИСПРАВЛЕНО: распаковываем 4 значения
-    success, qa, err, gen_tokens = await ai_client.generate_quiz_question(md_text)
+    difficulty = await asyncio.to_thread(db.get_user_difficulty, user_id)
+    
+    success, qa, err, gen_tokens = await ai_client.generate_quiz_question(md_text, difficulty)
     if not success:
         await call.message.answer(f"❌ AI ошибка: {err}")
         return
