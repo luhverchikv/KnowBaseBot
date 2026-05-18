@@ -21,7 +21,7 @@ def quiz_menu_keyboard():
         InlineKeyboardButton(text="🎲 Сгенерировать вопрос", callback_data="quiz_generate")
     ).as_markup()
 
-@router.message(F.text == "Викторина")
+@router.message(F.text == "🎓 Викторина")
 async def quiz_menu(message: Message):
     await message.answer(
         "🧠 <b>Викторина</b>\n\n"
