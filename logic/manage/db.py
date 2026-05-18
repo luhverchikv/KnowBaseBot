@@ -390,15 +390,17 @@ class Database:
         Возвращает статистику токенов за конкретную дату.
         :param date: дата в формате 'YYYY-MM-DD' или относительная ('now', '-1 day')
         """
-        self.cursor.execute(f'''
+        # ✅ Используем параметризованный запрос (?) — SQLite сам подставит значение корректно
+        self.cursor.execute('''
             SELECT 
                 COUNT(*) as questions_count,
                 COALESCE(SUM(gen_total_tokens), 0) as gen_tokens,
                 COALESCE(SUM(eval_total_tokens), 0) as eval_tokens,
                 COALESCE(SUM(gen_total_tokens + eval_total_tokens), 0) as total_tokens
             FROM quiz_questions 
-            WHERE DATE(generated_at) = DATE({date})
-        ''')
+            WHERE DATE(generated_at) = DATE(?)
+        ''', (date,))
+        
         row = self.cursor.fetchone()
         return {
             'questions': row[0] or 0,
@@ -406,6 +408,8 @@ class Database:
             'eval_tokens': row[2] or 0,
             'total_tokens': row[3] or 0
         } if row else {'questions': 0, 'gen_tokens': 0, 'eval_tokens': 0, 'total_tokens': 0}
+    
+
 
     def get_daily_summary(self) -> dict:
         """Возвращает сводку за сегодня и вчера."""
