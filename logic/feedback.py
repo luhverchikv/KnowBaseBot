@@ -38,7 +38,7 @@ async def feedback_start(message: Message, state: FSMContext):
     )
     
     await message.answer(text, reply_markup=feedback_cancel_keyboard(), parse_mode="HTML")
-
+    await message.delete()
 
 @router.callback_query(F.data == "feedback_cancel", FeedbackStates.waiting_feedback)
 async def feedback_cancel(call: CallbackQuery, state: FSMContext):
