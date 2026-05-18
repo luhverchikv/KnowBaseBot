@@ -59,7 +59,7 @@ def get_manage_text(user_id: int) -> str:
 
 
 # ======Тригер====
-@router.message(F.text == "Управление базой")
+@router.message(F.text == "📂 Управление базой")
 async def handle_manage(message: Message):
     await message.answer(
         text=get_manage_text(message.from_user.id),
