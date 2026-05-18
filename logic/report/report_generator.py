@@ -126,7 +126,7 @@ def format_stats_text(stats: dict, period: str = "всё время") -> str:
     return text
 
 # ===================== HANDLERS =====================
-@router.message(F.text == "Анализ")
+@router.message(F.text == "📊 Анализ")
 async def report_menu(message: Message):
     """Точка входа в раздел «Анализ»."""
     await message.answer(
