@@ -18,7 +18,7 @@ def start_keyboard():
     )
     builder.row(
         KeyboardButton(text="Анализ"),
-        KeyboardButton(text="Обратная связь")
+        KeyboardButton(text="⚙️ Настройки")
     )
     return builder.as_markup(resize_keyboard=True)
 
