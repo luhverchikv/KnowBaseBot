@@ -385,3 +385,38 @@ class Database:
         return self.cursor.fetchall()
 
 
+    def get_token_stats_by_date(self, date: str) -> dict:
+        """
+        Возвращает статистику токенов за конкретную дату.
+        :param date: дата в формате 'YYYY-MM-DD' или относительная ('now', '-1 day')
+        """
+        self.cursor.execute(f'''
+            SELECT 
+                COUNT(*) as questions_count,
+                COALESCE(SUM(gen_total_tokens), 0) as gen_tokens,
+                COALESCE(SUM(eval_total_tokens), 0) as eval_tokens,
+                COALESCE(SUM(gen_total_tokens + eval_total_tokens), 0) as total_tokens
+            FROM quiz_questions 
+            WHERE DATE(generated_at) = DATE({date})
+        ''')
+        row = self.cursor.fetchone()
+        return {
+            'questions': row[0] or 0,
+            'gen_tokens': row[1] or 0,
+            'eval_tokens': row[2] or 0,
+            'total_tokens': row[3] or 0
+        } if row else {'questions': 0, 'gen_tokens': 0, 'eval_tokens': 0, 'total_tokens': 0}
+
+    def get_daily_summary(self) -> dict:
+        """Возвращает сводку за сегодня и вчера."""
+        today = self.get_token_stats_by_date("'now'")
+        yesterday = self.get_token_stats_by_date("'-1 day'")
+        total_users = self.get_total_users_count()
+        
+        return {
+            'total_users': total_users,
+            'today': today,
+            'yesterday': yesterday
+        }
+
+
