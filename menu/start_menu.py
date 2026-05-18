@@ -106,3 +106,7 @@ async def user_help_handler(message: Message):
         "Спасибо, что помогаете нам становиться лучше! ❤️\n\n"
     )
 
+
+@router.callback_query(F.data == "close_callback")
+async def close_callback_handler(call: CallbackQuery):
+    await call.message.delete()
