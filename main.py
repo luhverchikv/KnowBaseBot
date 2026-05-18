@@ -12,6 +12,7 @@ from logic.report.report_generator import router as report_router
 from admin.admin import router as admin_router
 from logic.feedback import router as feedback_router
 from menu.settings import router as settings_router
+from utils.reminders.scheduler import setup_reminder_scheduler
 
 
 async def main():
@@ -21,9 +22,9 @@ async def main():
 
     bot = Bot(config.bot.token)
     dp = Dispatcher()
-
     logger.bind(bot_id=bot.id).info("Bot instance created")
-
+    scheduler = setup_reminder_scheduler(bot)
+    
     dp.include_router(menu_router)
     dp.include_router(kb_router)
     dp.include_router(quiz_router)
