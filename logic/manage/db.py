@@ -408,9 +408,9 @@ class Database:
         } if row else {'questions': 0, 'gen_tokens': 0, 'eval_tokens': 0, 'total_tokens': 0}
 
     def get_daily_summary(self) -> dict:
-        """Возвращает сводку за сегодня и вчера."""
-        today = self.get_token_stats_by_date("now")
-        yesterday = self.get_token_stats_by_date("-1 day")
+    """Возвращает сводку за сегодня и вчера."""
+        today = self.get_token_stats_by_date("now")        # ← Без кавычек!
+        yesterday = self.get_token_stats_by_date("-1 day")  # ← Без кавычек!
         total_users = self.get_total_users_count()
         
         return {
@@ -418,5 +418,6 @@ class Database:
             'today': today,
             'yesterday': yesterday
         }
+
 
 
