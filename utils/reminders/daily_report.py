@@ -1,4 +1,5 @@
 # utils/reminders/daily_report.py
+import asyncio
 from aiogram import Bot
 from logic.manage.db import Database
 from utils.logger import logger
