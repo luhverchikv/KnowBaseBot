@@ -16,8 +16,24 @@ async def send_daily_analytics(bot: Bot, owner_id: int):
         def fmt(n: int) -> str:
             return f"{n:,}".replace(",", " ")
         
+        # ✅ Получаем непрочитанные отзывы (последние 5)
+        unread_feedback = await asyncio.to_thread(db.get_feedback_paginated, limit=5, only_unread=True)
+        
+        # Формируем блок с отзывами
+        feedback_block = ""
+        if unread_feedback:
+            feedback_block = f"\n\n💬 <b>Новые отзывы ({len(unread_feedback)}):</b>\n"
+            for fb_id, user_db_id, fb_text, created_at, tg_id in unread_feedback:
+                display_id = tg_id if tg_id else f"user_{user_db_id}"
+                preview = fb_text[:100] + ("..." if len(fb_text) > 100 else "")
+                feedback_block += f"• 👤 <code>{display_id}</code> • <i>{created_at}</i>\n  <i>{preview}</i>\n"
+            if len(unread_feedback) == 5:
+                feedback_block += f"\n<i>Есть ещё непрочитанные отзывы. Проверьте в админ-панели.</i>"
+        else:
+            feedback_block = "\n\n✅ <b>Новых отзывов нет.</b>"
+        
         text = (
-            f"📊 <b>Утренняя аналитика</b> • {datetime.now().strftime('%d.%m.%Y')}\n\n"
+            f"📊 <b>Утренняя аналитика</b> • {datetime.datetime.now().strftime('%d.%m.%Y')}\n\n"
             f"👥 <b>Пользователи:</b>\n"
             f"• Всего: <b>{fmt(summary['total_users'])}</b>\n\n"
             f"📅 <b>Вчера:</b>\n"
@@ -30,6 +46,7 @@ async def send_daily_analytics(bot: Bot, owner_id: int):
             f"• Токенов: <b>{fmt(summary['today']['total_tokens'])}</b>\n"
             f"  ├─ Генерация: {fmt(summary['today']['gen_tokens'])}\n"
             f"  └─ Оценка: {fmt(summary['today']['eval_tokens'])}"
+            f"{feedback_block}"
         )
         
         await bot.send_message(
