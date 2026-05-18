@@ -365,3 +365,23 @@ class Database:
         with self.connection:
             self.cursor.execute("UPDATE users SET difficulty = ? WHERE user_id = ?", (difficulty, user_id))
 
+
+    # ==== Работа с напоминаниями ====
+    def get_user_reminders(self, user_id: int) -> int:
+        """Возвращает статус напоминаний (0 или 1)."""
+        self.cursor.execute("SELECT reminders FROM users WHERE user_id = ?", (user_id,))
+        res = self.cursor.fetchone()
+        return res[0] if res else 0
+
+    def set_user_reminders(self, user_id: int, value: int) -> None:
+        """Обновляет статус напоминаний."""
+        if value not in (0, 1): value = 0
+        with self.connection:
+            self.cursor.execute("UPDATE users SET reminders = ? WHERE user_id = ?", (value, user_id))
+
+    def get_users_by_reminders(self, reminder_type: int) -> list[tuple]:
+        """Возвращает список user_id пользователей с указанным типом напоминаний."""
+        self.cursor.execute("SELECT user_id FROM users WHERE reminders = ?", (reminder_type,))
+        return self.cursor.fetchall()
+
+
