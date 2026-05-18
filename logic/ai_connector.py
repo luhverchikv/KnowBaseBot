@@ -97,11 +97,20 @@ class AIConnector:
             logger.exception("Unexpected error in AIConnector")
             return False, None, f"Неизвестная ошибка: {e}", None
 
-    async def generate_quiz_question(self, md_text: str) -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
-        system = "Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text."
+    # logic/ai_connector.py (замените метод generate_quiz_question)
+    async def generate_quiz_question(self, md_text: str, difficulty: str = 'medium') -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
+        difficulty_prompts = {
+            'easy': "Вопрос должен быть простым, прямым и проверять базовое запоминание фактов. Подходит для новичков.",
+            'medium': "Вопрос должен быть умеренно сложным, требовать понимания материала и применения знаний на практике.",
+            'hard': "Вопрос должен быть сложным, требовать глубокого анализа, синтеза информации или оценки нескольких концепций одновременно."
+        }
+        diff_instr = difficulty_prompts.get(difficulty, difficulty_prompts['medium'])
+        
+        system = f"Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text.\nDifficulty level: {difficulty.upper()}. {diff_instr}"
         safe_text = md_text[:3000]
         prompt = f"Generate ONE clear quiz question and its exact correct answer based on this text:\n{safe_text}"
         return await self._call_api(system, prompt)
+
 
     async def evaluate_answer(self, question: str, correct: str, user: str) -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
         system = "Return strictly valid JSON with keys: 'correctness' (one of: 'правильно','частично','неправильно'), 'feedback' (short explanation in Russian), 'rating' (1-5)."
