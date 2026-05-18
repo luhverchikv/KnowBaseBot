@@ -1,1 +1,21 @@
-#
+services:
+  knowbase-bot:
+    build: .                 # Собирать образ из Dockerfile в текущей папке
+    container_name: knowbase-bot
+    restart: unless-stopped  # Перезапускать при ошибках или перезагрузке сервера
+    
+    # Переменные окружения из .env файла
+    env_file:
+      - .env
+    
+    # Проброс папок (Volumes)
+    # Папка database: там лежит SQLite и файлы пользователей. 
+    # Папка logs: туда пишутся логи.
+    volumes:
+      - ./database:/app/database
+      - ./logs:/app/logs
+    
+    # Настройка часового пояса (чтобы логи и планировщик работали правильно)
+    environment:
+      - TZ=Europe/Minsk
+
