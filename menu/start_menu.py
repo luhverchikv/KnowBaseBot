@@ -13,7 +13,7 @@ db = Database()
 def start_keyboard():
     builder = ReplyKeyboardBuilder()
     builder.row(
-        KeyboardButton(text="Управление базой"),
+        KeyboardButton(text="📂 Управление базой"),
         KeyboardButton(text="Викторина")
     )
     builder.row(
