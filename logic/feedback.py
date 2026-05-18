@@ -24,7 +24,7 @@ def feedback_cancel_keyboard():
     return kb.as_markup()
 
 # ===================== HANDLERS =====================
-@router.message(F.text == "Обратная связь")
+@router.message(F.text == "💬 Обратная связь")
 async def feedback_start(message: Message, state: FSMContext):
     """Точка входа: пользователь нажал кнопку «Обратная связь»."""
     await state.set_state(FeedbackStates.waiting_feedback)
