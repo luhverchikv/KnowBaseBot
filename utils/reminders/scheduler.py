@@ -21,14 +21,24 @@ def setup_reminder_scheduler(bot: Bot) -> AsyncIOScheduler:
         replace_existing=True
     )
     
-    # 📊 Утренняя аналитика админу (7:00)
+    from datetime import datetime, timedelta
+    next_run = datetime.now() + timedelta(minutes=1)
     scheduler.add_job(
         send_daily_analytics,
-        CronTrigger(hour=7, minute=0),
-        args=[bot, config.bot.owner_id],  # ✅ Передаём bot и owner_id
-        id="daily_analytics_report",
-        replace_existing=True
+        'date',
+        run_date=next_run,
+        args=[bot, config.bot.owner_id],
+        id="daily_analytics_test"
     )
+
+    # 📊 Утренняя аналитика админу (7:00)
+    #scheduler.add_job(
+        #send_daily_analytics,
+        #CronTrigger(hour=7, minute=0),
+        #args=[bot, config.bot.owner_id],  # ✅ Передаём bot и owner_id
+        #id="daily_analytics_report",
+        #replace_existing=True
+    #)
     
     scheduler.start()
     logger.info("⏰ Reminder scheduler started successfully.")
