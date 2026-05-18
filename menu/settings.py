@@ -88,17 +88,25 @@ async def handle_difficulty_selection(call: CallbackQuery):
 
 @router.callback_query(F.data == "settings_reminders")
 async def settings_reminders(call: CallbackQuery):
-    """Заглушка для напоминаний."""
+    """Переключает напоминания вкл/выкл."""
     await call.answer()
+    user_id = call.from_user.id
+    
+    # Получаем текущее значение и инвертируем
+    current = await asyncio.to_thread(db.get_user_reminders, user_id)
+    new_val = 1 if current == 0 else 0
+    await asyncio.to_thread(db.set_user_reminders, user_id, new_val)
+    
+    status = "✅ Включены (9:00)" if new_val == 1 else "❌ Выключены"
     await call.message.edit_text(
-        "🔔 <b>Напоминания</b>\n\n"
-        "Здесь можно будет настроить:\n"
-        "• Время напоминания\n"
-        "• Частоту уведомлений\n\n"
-        "Функция в разработке.",
+        f"🔔 <b>Управление напоминаниями</b>\n\n"
+        f"Статус: {status}\n\n"
+        f"Нажмите на кнопку ещё раз, чтобы изменить.",
         reply_markup=settings_keyboard(),
         parse_mode="HTML"
     )
+
+
 
 @router.callback_query(F.data == "settings_back")
 async def settings_back(call: CallbackQuery):
