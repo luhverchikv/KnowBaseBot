@@ -46,6 +46,7 @@ def get_manage_keyboard() -> InlineKeyboardBuilder:
     kb.row(InlineKeyboardButton(text="📥 Загрузить", callback_data="kb_upload"))
     kb.row(InlineKeyboardButton(text="🗑️ Удалить", callback_data="kb_delete"))
     kb.row(InlineKeyboardButton(text="👁️ Просмотреть", callback_data="kb_view"))
+    kb.row(InlineKeyboardButton(text="❌ Закрыть", callback_data="close_callback"))
     return kb
 
 def get_manage_text(user_id: int) -> str:
