@@ -135,6 +135,7 @@ async def report_menu(message: Message):
         reply_markup=report_keyboard(),
         parse_mode="HTML"
     )
+    await message.delete()
 
 @router.callback_query(F.data == "report_day")
 async def report_day(call: CallbackQuery):
