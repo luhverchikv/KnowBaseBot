@@ -29,13 +29,22 @@ def difficulty_keyboard():
 
 @router.message(F.text == "⚙️ Настройки")
 async def settings_menu(message: Message):
-    """Точка входа в настройки."""
-    await message.answer(
+    """Точка входа в настройки с отображением текущих параметров."""
+    user_id = message.from_user.id
+    # ✅ Асинхронно получаем текущие значения из БД
+    difficulty = await asyncio.to_thread(db.get_user_difficulty, user_id)
+    reminders = await asyncio.to_thread(db.get_user_reminders, user_id)
+    # ✅ Форматируем для красивого вывода
+    diff_map = {"easy": "😊 Легкий", "medium": "🤔 Средний", "hard": "😈 Сложный"}
+    diff_text = diff_map.get(difficulty, "🤔 Средний")
+    remind_text = "🔔 Включены" if reminders == 1 else "🔕 Выключены"
+    text = (
         "⚙️ <b>Настройки бота</b>\n\n"
-        "Выберите параметр, который хотите изменить:",
-        reply_markup=settings_keyboard(),
-        parse_mode="HTML"
+        f"🧠 Уровень сложности: <b>{diff_text}</b>\n"
+        f"🔔 Напоминания: <b>{remind_text}</b>\n\n"
+        "Выберите параметр, который хотите изменить:"
     )
+    await message.answer(text=text, reply_markup=settings_keyboard(), parse_mode="HTML")
     await message.delete()
 
 @router.callback_query(F.data == "settings_difficulty")
