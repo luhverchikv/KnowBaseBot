@@ -30,8 +30,9 @@ async def quiz_menu(message: Message):
         reply_markup=quiz_menu_keyboard(),
         parse_mode="HTML"
     )
+    await message.delete()
 
-# logic/quiz.py (фрагменты с исправлениями)
+
 @router.callback_query(F.data == "quiz_generate")
 async def handle_generate(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -39,12 +40,12 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     
     max_q = await asyncio.to_thread(db.get_max_questions_per_day, user_id)
     if await asyncio.to_thread(db.get_daily_questions_count, user_id) >= max_q:
-        await call.message.answer(f"❌ Лимит ({max_q}) исчерпан. Возвращайтесь завтра!")
+        await call.message.edit_text(f"❌ Лимит ({max_q}) исчерпан. Возвращайтесь завтра!")
         return
 
     filename = await asyncio.to_thread(db.get_random_user_file, user_id)
     if not filename:
-        await call.message.answer("📂 База пуста. Загрузите .md файлы.")
+        await call.message.edit_text("📂 База пуста. Загрузите .md файлы.")
         return
 
     file_path = Path("database") / str(user_id) / filename
@@ -52,15 +53,15 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
         md_text = await asyncio.to_thread(file_path.read_text, encoding="utf-8")
     except Exception as e:
         logger.error(f"Read fail: {e}")
-        await call.message.answer("❌ Ошибка чтения файла.")
+        await call.message.edit_text("❌ Ошибка чтения файла.")
         return
 
-    await call.message.answer("⏳ Генерирую вопрос...")
+    await call.message.edit_text("⏳ Генерирую вопрос...")
     difficulty = await asyncio.to_thread(db.get_user_difficulty, user_id)
     
     success, qa, err, gen_tokens = await ai_client.generate_quiz_question(md_text, difficulty)
     if not success:
-        await call.message.answer(f"❌ AI ошибка: {err}")
+        await call.message.edit_text(f"❌ AI ошибка: {err}")
         return
 
     # ✅ ИСПРАВЛЕНО: передаём gen_tokens
@@ -79,7 +80,7 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     await state.set_state(QuizStates.waiting_answer)
     
     kb = InlineKeyboardBuilder().row(InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel"))
-    await call.message.answer(
+    await call.message.edit_text(
         f"❓ <b>Вопрос:</b>\n{qa.get('question', '?')}\n\nНапишите ответ:",
         reply_markup=kb.as_markup(),
         parse_mode="HTML"
