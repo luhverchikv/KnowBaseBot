@@ -13,7 +13,7 @@ def settings_keyboard():
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="🧠 Уровень сложности", callback_data="settings_difficulty"))
     kb.row(InlineKeyboardButton(text="🔔 Напоминания", callback_data="settings_reminders"))
-    kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="settings_back"))
+    kb.row(InlineKeyboardButton(text="❌ Закрыть", callback_data="close_callback"))
     return kb.as_markup()
 
 def difficulty_keyboard():
