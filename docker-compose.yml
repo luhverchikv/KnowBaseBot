@@ -3,7 +3,8 @@ services:
     build: .                 # Собирать образ из Dockerfile в текущей папке
     container_name: knowbase-bot
     restart: unless-stopped  # Перезапускать при ошибках или перезагрузке сервера
-    
+    # Защита от потери данных БД при перезагрузке
+    stop_grace_period: 1m 
     # Переменные окружения из .env файла
     env_file:
       - .env
