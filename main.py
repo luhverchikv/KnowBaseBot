@@ -12,7 +12,7 @@ from logic.report.report_generator import router as report_router
 from admin.admin import router as admin_router
 from logic.feedback import router as feedback_router
 from menu.settings import router as settings_router
-from utils.reminders.scheduler import setup_reminder_scheduler
+from utils.scheduler import setup_reminder_scheduler
 
 
 async def main():
