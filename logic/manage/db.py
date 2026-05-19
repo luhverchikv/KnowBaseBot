@@ -385,21 +385,19 @@ class Database:
         return self.cursor.fetchall()
 
 
-    def get_token_stats_by_date(self, date: str) -> dict:
+    def get_token_stats_by_date(self, date_sql: str) -> dict:
         """
-        Возвращает статистику токенов за конкретную дату.
-        :param date: дата в формате 'YYYY-MM-DD' или относительная ('now', '-1 day')
+        :param date_sql: SQL выражение для даты, например "'now'" или "DATE('now', '-1 day')"
         """
-        # ✅ Используем параметризованный запрос (?) — SQLite сам подставит значение корректно
-        self.cursor.execute('''
+        self.cursor.execute(f'''
             SELECT 
                 COUNT(*) as questions_count,
                 COALESCE(SUM(gen_total_tokens), 0) as gen_tokens,
                 COALESCE(SUM(eval_total_tokens), 0) as eval_tokens,
                 COALESCE(SUM(gen_total_tokens + eval_total_tokens), 0) as total_tokens
             FROM quiz_questions 
-            WHERE DATE(generated_at) = DATE(?)
-        ''', (date,))
+            WHERE DATE(generated_at) = DATE({date_sql})
+        ''')
         
         row = self.cursor.fetchone()
         return {
@@ -409,18 +407,20 @@ class Database:
             'total_tokens': row[3] or 0
         } if row else {'questions': 0, 'gen_tokens': 0, 'eval_tokens': 0, 'total_tokens': 0}
     
-
-
+    
     def get_daily_summary(self) -> dict:
         """Возвращает сводку за сегодня и вчера."""
-        today = self.get_token_stats_by_date("now")
-        yesterday = self.get_token_stats_by_date("-1 day")
+        today = self.get_token_stats_by_date("'now'")
+        yesterday = self.get_token_stats_by_date("DATE('now', '-1 day')")
         total_users = self.get_total_users_count()
+        
         return {
             'total_users': total_users,
             'today': today,
             'yesterday': yesterday
         }
+
+
 
 
 
