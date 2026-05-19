@@ -25,16 +25,16 @@ def setup_reminder_scheduler(bot: Bot) -> AsyncIOScheduler:
     
     # 2. 🧪 Тестовая отправка аналитики через 1 минуту после старта
     # ✅ ВАЖНО: используем datetime.now(tz), чтобы время было "aware" и совпадало с планировщиком
-    #next_run = datetime.now(tz) + timedelta(minutes=1)
-    #logger.info(f"⏳ Scheduling test analytics job for: {next_run}")
+    next_run = datetime.now(tz) + timedelta(minutes=1)
+    logger.info(f"⏳ Scheduling test analytics job for: {next_run}")
     
-    #scheduler.add_job(
-        #send_daily_analytics,
-        #DateTrigger(run_date=next_run),
-        #args=[bot, config.bot.owner_id],
-        #id="daily_analytics_test",
-        #replace_existing=True
-    #)
+    scheduler.add_job(
+        send_daily_analytics,
+        DateTrigger(run_date=next_run),
+        args=[bot, config.bot.owner_id],
+        id="daily_analytics_test",
+        replace_existing=True
+    )
 
     # 3. 📊 Ежедневная аналитика админу (7:00)
     # Раскомментируйте для продакшена, когда тест пройдет успешно
