@@ -25,7 +25,7 @@ def report_keyboard():
 def back_to_menu_keyboard():
     """Кнопка возврата в главное меню."""
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(text="🏠 В главное меню", callback_data="report_back"))
+    kb.row(InlineKeyboardButton(text="❌ Закрыть", callback_data="close_callback"))
     return kb.as_markup()
 
 # ===================== DB WRAPPERS (async-safe) =====================
@@ -161,16 +161,6 @@ async def report_overall(call: CallbackQuery):
     text = format_stats_text(stats, "всё время")
     await call.message.answer(text, reply_markup=back_to_menu_keyboard(), parse_mode="HTML")
 
-@router.callback_query(F.data == "report_back")
-async def report_back(call: CallbackQuery):
-    """Возврат в главное меню."""
-    await call.answer()
-    from menu.start_menu import start_text, start_keyboard
-    await call.message.edit_text(
-        text=start_text,
-        reply_markup=start_keyboard(),
-        parse_mode="HTML"
-    )
 
 # ===================== ЭКСПОРТ (заготовка) =====================
 @router.callback_query(F.data == "report_export")
