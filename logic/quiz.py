@@ -23,10 +23,12 @@ def quiz_menu_keyboard():
 
 @router.message(F.text == "🎓 Викторина")
 async def quiz_menu(message: Message):
+    max_questions = await asyncio.to_thread(db.get_max_questions_per_day, user_id)
+    user_id = message.from_user.id
     await message.answer(
         "🧠 <b>Викторина</b>\n\n"
         "Нажмите кнопку, чтобы получить вопрос по вашей базе.\n"
-        "Лимит: 3 в день.",
+        f"Лимит: <b>{max_questions}</b> в день.",
         reply_markup=quiz_menu_keyboard(),
         parse_mode="HTML"
     )
