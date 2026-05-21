@@ -67,7 +67,7 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
         await call.message.edit_text(f"❌ AI ошибка: {err}")
         return
 
-    # ✅ ИСПРАВЛЕНО: передаём gen_tokens
+    # ✅ Сохраняем вопрос в БД
     q_id = await asyncio.to_thread(
         db.add_quiz_question,
         user_id, filename,
@@ -78,16 +78,22 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     await state.update_data(
         question_id=q_id,
         correct_answer=qa.get("correct_answer", ""),
-        question_text=qa.get("question", "")
+        question_text=qa.get("question", ""),
+        source_file=filename  # ✅ Сохраняем имя файла в состоянии (на всякий случай)
     )
     await state.set_state(QuizStates.waiting_answer)
     
+    # ✅ Формируем красивое имя файла для отображения
+    display_filename = filename if len(filename) <= 30 else filename[:27] + "..."
+    
     kb = InlineKeyboardBuilder().row(InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel"))
     await call.message.answer(
+        f"📄 <i>Источник: {display_filename}</i>\n\n"  # ✅ Добавили источник
         f"❓ <b>Вопрос:</b>\n{qa.get('question', '?')}\n\nНапишите ответ:",
         reply_markup=kb.as_markup(),
         parse_mode="HTML"
     )
+    
 
 @router.message(QuizStates.waiting_answer)
 async def handle_answer(message: Message, state: FSMContext):
