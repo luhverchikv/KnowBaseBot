@@ -12,7 +12,7 @@ from .recognizer import recognize_text_from_wav
 router = Router()
 
 
-@voice_router.message(F.voice)
+@router.message(F.voice)
 async def process_voice(message: Message):
     user_id = message.from_user.id
     # 🔊 ПРОВЕРКА ДЛИТЕЛЬНОСТИ ГОЛОСОВОГО СООБЩЕНИЯ
