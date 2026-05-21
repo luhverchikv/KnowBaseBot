@@ -1,4 +1,7 @@
 # logic/quiz.py
+import os
+from voice_engine.converter import ogg_to_wav
+from voice_engine.recognizer import recognize_text_from_wav
 import asyncio
 from pathlib import Path
 from aiogram import Router, F
@@ -95,17 +98,57 @@ async def handle_generate(call: CallbackQuery, state: FSMContext):
     )
     
 
-@router.message(QuizStates.waiting_answer)
+@router.message(QuizStates.waiting_answer, F.text | F.voice)
 async def handle_answer(message: Message, state: FSMContext):
     data = await state.get_data()
     q_id = data.get("question_id")
     correct = data.get("correct_answer", "")
     question = data.get("question_text", "")
-    user_answer = message.text
 
+    user_answer = ""
+
+    # 🎙️ Обработка голосового сообщения
+    if message.voice:
+        if message.voice.duration > 60:
+            await message.answer("⚠️ Голосовое слишком длинное (макс. 60 сек). Повторите или напишите текстом.")
+            return
+
+        await message.answer("⏳ Распознаю речь...")
+
+        file = await message.bot.get_file(message.voice.file_id)
+        # Уникальные имена файлов, чтобы избежать конфликтов при одновременных ответах
+        ogg_path = f"temp_voice_{message.from_user.id}_{q_id}.ogg"
+        wav_path = f"temp_voice_{message.from_user.id}_{q_id}.wav"
+
+        await message.bot.download_file(file.file_path, destination=ogg_path)
+        await ogg_to_wav(ogg_path, wav_path)
+
+        try:
+            user_answer = recognize_text_from_wav(wav_path)
+        except Exception as e:
+            logger.error(f"Voice recognition failed: {e}")
+            await message.answer("⚠️ Ошибка распознавания. Попробуйте ещё раз или напишите текстом.")
+            return
+        finally:
+            # Очистка временных файлов
+            for p in (ogg_path, wav_path):
+                if os.path.exists(p):
+                    os.remove(p)
+
+        if not user_answer:
+            await message.answer("⚠️ Не удалось распознать речь. Попробуйте ещё раз или напишите текстом.")
+            return
+
+    # 📝 Обработка текстового сообщения
+    elif message.text:
+        user_answer = message.text.strip()
+        if not user_answer:
+            return  # Игнорируем пустые сообщения
+    else:
+        return  # Игнорируем другие типы медиа
+
+    # 🤖 Оценка ответа ИИ
     await message.answer("⏳ ИИ оценивает ваш ответ...")
-    
-    # ✅ ИСПРАВЛЕНО: распаковываем 4 значения
     success, res, err, eval_tokens = await ai_client.evaluate_answer(question, correct, user_answer)
     if not success:
         await message.answer(f"❌ Оценка не удалась: {err}")
@@ -116,7 +159,7 @@ async def handle_answer(message: Message, state: FSMContext):
     feedback = res.get("feedback", "Оценка завершена.")
     rating = res.get("rating", 3)
 
-    # ✅ ИСПРАВЛЕНО: сохраняем токены оценки
+    # ✅ Сохраняем токены оценки
     if eval_tokens:
         await asyncio.to_thread(db.update_eval_tokens, q_id, eval_tokens)
 
@@ -126,7 +169,7 @@ async def handle_answer(message: Message, state: FSMContext):
 
     emoji = {"правильно": "✅", "частично": "🔶", "неправильно": "❌"}.get(correctness, "❓")
     stars = "⭐" * rating + "☆" * (5 - rating)
-    
+
     await message.answer(
         f"{emoji} <b>Результат:</b> {correctness}\n"
         f"{stars} <b>Балл:</b> {rating}/5\n\n"
@@ -135,8 +178,7 @@ async def handle_answer(message: Message, state: FSMContext):
         f"✅ <b>Правильный ответ:</b>\n<i>{correct}</i>",
         reply_markup=quiz_menu_keyboard(),
         parse_mode="HTML"
-    )
-
+        )
 
 @router.callback_query(F.data == "quiz_cancel")
 async def cancel_quiz(call: CallbackQuery, state: FSMContext):
