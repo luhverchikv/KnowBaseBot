@@ -1,6 +1,11 @@
 # Используем легкую версию Python
 FROM python:3.10-slim
 
+# 🛠 Устанавливаем системные зависимости (ffmpeg)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
 # Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
