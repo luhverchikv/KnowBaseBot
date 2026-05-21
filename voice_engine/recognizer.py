@@ -4,7 +4,7 @@ import os
 import wave
 import json
 from vosk import Model, KaldiRecognizer
-from .numbers import words_to_number
+
 
 MODEL_PATH = "vosk-model-small-ru-0.22"
 
@@ -32,7 +32,3 @@ def recognize_text_from_wav(wav_path: str) -> str:
     text += " " + result.get("text", "")
     return text.strip()
 
-
-def recognize_number_from_text(text: str) -> int | None:
-    """Пробует извлечь число из текста."""
-    return words_to_number(text)
