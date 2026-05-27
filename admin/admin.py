@@ -185,6 +185,7 @@ async def admin_user_info_handler(call: CallbackQuery):
 
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="✏️ Редактировать лимиты", callback_data=f"admin_edit_limits:{user_id}"))
+    kb.row(InlineKeyboardButton(text="📊 Выгрузить отчёт (30 дней)", callback_data=f"admin_export:{user_id}"))
     kb.row(InlineKeyboardButton(text="🔙 В меню админа", callback_data="admin_back_to_menu"))
 
     await call.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
