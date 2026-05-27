@@ -9,6 +9,8 @@ from utils.filter import is_owner
 from logic.manage.db import Database
 from utils.pagination import build_pagination_keyboard
 from utils.numeric_keyboard import numeric_keyboard
+from utils.logger import logger
+from aiogram.exceptions import TelegramBadRequest
 
 
 router = Router()
@@ -521,3 +523,74 @@ async def admin_back_to_menu(call: CallbackQuery):
     )
 
 
+@admin_router.callback_query(F.data.startswith("admin_export:"))
+async def handle_export_request(callback: CallbackQuery):
+    """Генерация и отправка Excel-отчёта для пользователя."""
+    await callback.answer()  # Убираем "часики"
+    
+    # Извлекаем user_id из callback_data
+    try:
+        target_user_id = int(callback.data.split(":")[1])
+    except (IndexError, ValueError):
+        await callback.message.edit_text("❌ Ошибка: неверный ID пользователя")
+        return
+    
+    # 🔹 Уведомление о начале генерации
+    progress_msg = await callback.message.edit_text(
+        f"⏳ Формирую отчёт за 30 дней для пользователя {target_user_id}...\n\n"
+        f"Это может занять до 30 секунд."
+    )
+    
+    try:
+        # 🔹 Получаем данные из БД (в потоке, чтобы не блокировать)
+        data = await asyncio.to_thread(
+            db.get_user_quiz_export_data, 
+            user_id=target_user_id, 
+            days=30
+        )
+        
+        if not data:
+            await progress_msg.edit_text(
+                f"⚠️ У пользователя {target_user_id} нет результатов за последние 30 дней.",
+                reply_markup=admin_user_profile_keyboard(target_user_id)
+            )
+            return
+        
+        # 🔹 Генерируем Excel
+        excel_file = await asyncio.to_thread(
+            create_excel_report,
+            data=data,
+            user_id=target_user_id,
+            period_days=30
+        )
+        
+        # 🔹 Отправляем файл
+        await callback.message.answer_document(
+            document=types.BufferedInputFile(
+                file=excel_file.getvalue(),
+                filename=f"KnowBase_Report_User{target_user_id}.xlsx"
+            ),
+            caption=(
+                f"📊 **Отчёт пользователя {target_user_id}**\n\n"
+                f"• Период: последние 30 дней\n"
+                f"• Вопросов: {len(data)}\n"
+                f"• Файл создан: {data[0]['generated_at'][:10]} — {datetime.now().strftime('%Y-%m-%d')}\n\n"
+                f"_Откройте в Excel, Google Таблицах или LibreOffice_"
+            ),
+            parse_mode="Markdown"
+        )
+        
+        
+        await progress_msg.edit_text(
+            f"✅ Отчёт успешно сформирован и отправлен!",
+            #reply_markup=admin_user_profile_keyboard(target_user_id)
+        )
+        
+        logger.info(f"📤 Export sent for user {target_user_id}: {len(data)} records")
+        
+    except Exception as e:
+        logger.error(f"❌ Export error for user {target_user_id}: {e}")
+        await progress_msg.edit_text(
+            f"❌ Ошибка при генерации отчёта:\n`{str(e)[:200]}`",
+            reply_markup=admin_user_profile_keyboard(target_user_id)
+        )
