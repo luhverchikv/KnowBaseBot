@@ -592,5 +592,5 @@ async def handle_export_request(callback: CallbackQuery):
         logger.error(f"❌ Export error for user {target_user_id}: {e}")
         await progress_msg.edit_text(
             f"❌ Ошибка при генерации отчёта:\n`{str(e)[:200]}`",
-            reply_markup=admin_user_profile_keyboard(target_user_id)
+            #reply_markup=admin_user_profile_keyboard(target_user_id)
         )
