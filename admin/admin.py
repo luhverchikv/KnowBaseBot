@@ -1,9 +1,11 @@
 # admin/admin.py
 import asyncio
+import io
 import math
+from datetime import datetime
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
+from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from utils.filter import is_owner
 from logic.manage.db import Database
@@ -566,7 +568,7 @@ async def handle_export_request(callback: CallbackQuery):
         
         # 🔹 Отправляем файл
         await callback.message.answer_document(
-            document=types.BufferedInputFile(
+            document=BufferedInputFile(
                 file=excel_file.getvalue(),
                 filename=f"KnowBase_Report_User{target_user_id}.xlsx"
             ),
