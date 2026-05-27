@@ -94,7 +94,7 @@ async def admin_stats_handler(call: CallbackQuery):
 
 
 @router.callback_query(F.data == "admin_close", is_owner)
-async def admin_back(call: CallbackQuery):
+async def admin_close(call: CallbackQuery):
     await call.answer()
     await call.message.delete()
 
@@ -144,11 +144,11 @@ async def admin_users_handler(call: CallbackQuery):
     await call.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
 
 
-@router.callback_query(F.data == "admin_back_to_menu", is_owner)
-async def admin_back_to_menu(call: CallbackQuery):
-    """Возврат в главное меню админки."""
-    await call.answer()
-    await call.message.edit_text(text=ADMIN_WELCOME, reply_markup=admin_keyboard(), parse_mode="HTML")
+#@router.callback_query(F.data == "admin_back_to_menu", is_owner)
+#async def admin_back_to_menu(call: CallbackQuery):
+    #"""Возврат в главное меню админки."""
+    #await call.answer()
+    #await call.message.edit_text(text=ADMIN_WELCOME, reply_markup=admin_keyboard(), parse_mode="HTML")
     
     
 @router.callback_query(F.data == "noop", is_owner)
