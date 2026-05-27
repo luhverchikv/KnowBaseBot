@@ -523,7 +523,7 @@ async def admin_back_to_menu(call: CallbackQuery):
     )
 
 
-@admin_router.callback_query(F.data.startswith("admin_export:"))
+@router.callback_query(F.data.startswith("admin_export:"))
 async def handle_export_request(callback: CallbackQuery):
     """Генерация и отправка Excel-отчёта для пользователя."""
     await callback.answer()  # Убираем "часики"
