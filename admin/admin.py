@@ -89,8 +89,9 @@ async def admin_stats_handler(call: CallbackQuery):
         f"• ✅ Оценка ответов: <b>{token_stats['evaluation']:,}</b>\n"
         f"• 📊 <b>Всего:</b> {token_stats['total']:,} токенов"
     )
+    unread = await asyncio.to_thread(db.get_unread_feedback_count)
     # Обновляем сообщение, сохраняя клавиатуру
-    await call.message.edit_text(text, reply_markup=admin_keyboard(), parse_mode="HTML")
+    await call.message.edit_text(text, reply_markup=admin_keyboard(unread), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "admin_close", is_owner)
@@ -110,7 +111,8 @@ async def admin_tokens_day(call: CallbackQuery):
         f"✅ Оценка: <b>{stats['evaluation']:,}</b>\n"
         f"📊 <b>Всего:</b> {stats['total']:,} токенов"
     )
-    await call.message.edit_text(text, reply_markup=admin_keyboard(), parse_mode="HTML")
+    unread = await asyncio.to_thread(db.get_unread_feedback_count)
+    await call.message.edit_text(text, reply_markup=admin_keyboard(unread), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "admin_users", is_owner)
@@ -402,10 +404,11 @@ async def _show_feedback_page(call: CallbackQuery, page: int):
     total = await asyncio.to_thread(db.get_unread_feedback_count)  # можно заменить на общий счётчик
     
     if not feedbacks:
+        unread = await asyncio.to_thread(db.get_unread_feedback_count)
         await call.message.edit_text(
             "📭 <b>Отзывов пока нет.</b>\n\n"
             "Как только пользователи напишут — они появятся здесь.",
-            reply_markup=admin_keyboard(),
+            reply_markup=admin_keyboard(unread),
             parse_mode="HTML"
         )
         return
