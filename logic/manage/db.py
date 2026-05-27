@@ -421,6 +421,39 @@ class Database:
         }
 
 
+    # logic/manage/db.py
 
+    def get_user_quiz_export_data(self, user_id: int, days: int = 30) -> list[dict]:
+        """
+        Возвращает данные для экспорта: результаты викторин пользователя за период.
+        """
+        self.cursor.execute('''
+            SELECT 
+                qq.id,
+                qq.generated_at,
+                qq.source_file,
+                qq.question,
+                qq.correct_answer,
+                qq.user_answer,
+                qq.correctness,
+                qq.rating,
+                qq.feedback,
+                qq.gen_total_tokens,
+                qq.eval_total_tokens
+            FROM quiz_questions qq
+            WHERE qq.user_id = ? 
+              AND DATE(qq.generated_at) >= DATE('now', ?)
+            ORDER BY qq.generated_at DESC
+        ''', (user_id, f'-{days} days'))
+        
+        columns = [
+            'id', 'generated_at', 'source_file', 'question', 'correct_answer',
+            'user_answer', 'correctness', 'rating', 'feedback',
+            'gen_tokens', 'eval_tokens'
+        ]
+        
+        return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+    
+    
 
 
