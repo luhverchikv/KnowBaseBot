@@ -11,7 +11,7 @@ from utils.pagination import build_pagination_keyboard
 from utils.numeric_keyboard import numeric_keyboard
 from utils.logger import logger
 from aiogram.exceptions import TelegramBadRequest
-
+from admin.export import create_excel_report
 
 router = Router()
 db = Database()
@@ -552,7 +552,7 @@ async def handle_export_request(callback: CallbackQuery):
         if not data:
             await progress_msg.edit_text(
                 f"⚠️ У пользователя {target_user_id} нет результатов за последние 30 дней.",
-                reply_markup=admin_user_profile_keyboard(target_user_id)
+                #reply_markup=admin_user_profile_keyboard(target_user_id)
             )
             return
         
