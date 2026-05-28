@@ -381,7 +381,7 @@ class Database:
             self.cursor.execute("UPDATE users SET difficulty = ? WHERE user_id = ?", (difficulty, user_id))
 
 
-    # ==== Работа с напоминаниями ====
+# ==== Работа с напоминаниями ====
     def get_user_reminders(self, user_id: int) -> int:
         """Возвращает статус напоминаний (0 или 1)."""
         self.cursor.execute("SELECT reminders FROM users WHERE user_id = ?", (user_id,))
@@ -437,6 +437,7 @@ class Database:
         }
 
 
+# ===== Экспорт данных ======
     def get_user_quiz_export_data(self, user_id: int, days: int = 30) -> list[dict]:
         """
         Возвращает данные для экспорта: результаты викторин пользователя за период.
