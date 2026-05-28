@@ -273,6 +273,7 @@ class Database:
             return 0
         return sum(1 for f in user_dir.iterdir() if f.is_file() and f.suffix.lower() in {".md", ".markdown"})
 
+#=== лимиты
     def get_user_limits(self, user_id: int) -> dict:
         """Возвращает текущие лимиты пользователя (безопасно для старых схем БД)."""
         try:
@@ -364,6 +365,8 @@ class Database:
             self.cursor.execute("DELETE FROM feedback WHERE id = ?", (feedback_id,))
             return self.cursor.rowcount > 0
 
+
+# === сложность вопросов
     def get_user_difficulty(self, user_id: int) -> str:
         """Возвращает уровень сложности пользователя."""
         self.cursor.execute("SELECT difficulty FROM users WHERE user_id = ?", (user_id,))
@@ -397,6 +400,7 @@ class Database:
         return self.cursor.fetchall()
 
 
+# ====
     def get_token_stats_by_date(self, date_sql: str) -> dict:
         """
         :param date_sql: SQL выражение для даты, например "'now'" или "DATE('now', '-1 day')"
@@ -433,8 +437,6 @@ class Database:
         }
 
 
-    # logic/manage/db.py
-
     def get_user_quiz_export_data(self, user_id: int, days: int = 30) -> list[dict]:
         """
         Возвращает данные для экспорта: результаты викторин пользователя за период.
@@ -465,7 +467,3 @@ class Database:
         ]
         
         return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
-    
-    
-
-
