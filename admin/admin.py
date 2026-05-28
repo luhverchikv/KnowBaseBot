@@ -154,13 +154,6 @@ async def admin_users_handler(call: CallbackQuery):
     text = f"👥 <b>Пользователи (стр. {page + 1}/{total_pages})</b>\n\nВсего в базе: <b>{total_users}</b>"
     await call.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
 
-
-#@router.callback_query(F.data == "admin_back_to_menu", is_owner)
-#async def admin_back_to_menu(call: CallbackQuery):
-    #"""Возврат в главное меню админки."""
-    #await call.answer()
-    #await call.message.edit_text(text=ADMIN_WELCOME, reply_markup=admin_keyboard(), parse_mode="HTML")
-    
     
 @router.callback_query(F.data == "noop", is_owner)
 async def noop_handler(call: CallbackQuery):
