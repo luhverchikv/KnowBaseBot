@@ -314,6 +314,18 @@ class Database:
     
     
 # ======== методы работы с отзывами =======
+    
+    def get_feedback_by_id(self, feedback_id: int) -> Optional[tuple]:
+        """
+        Возвращает полный отзыв по ID.
+        :return: кортеж (user_id, feedback_text, created_at, is_read) или None
+        """
+        self.cursor.execute(
+            "SELECT user_id, feedback_text, created_at, is_read FROM feedback WHERE id = ?",
+            (feedback_id,)
+        )
+        return self.cursor.fetchone()
+        
     def save_feedback(self, user_id: int, feedback_text: str) -> int:
         """Сохраняет отзыв пользователя."""
         with self.connection:
