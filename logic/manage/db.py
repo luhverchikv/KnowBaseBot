@@ -341,7 +341,7 @@ class Database:
         self.cursor.execute(f'''
             SELECT f.id, f.user_id, f.feedback_text, f.created_at, u.user_id as tg_id
             FROM feedback f
-            LEFT JOIN users u ON f.user_id = u.id
+            LEFT JOIN users u ON f.user_id = u.user_id
             {filter_clause}
             ORDER BY f.created_at DESC
             LIMIT ? OFFSET ?
