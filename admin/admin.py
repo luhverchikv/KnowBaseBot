@@ -455,6 +455,7 @@ async def admin_feedback_page_change(call: CallbackQuery):
         page = 0
     await _show_feedback_page(call, page)
 
+
 @router.callback_query(F.data.startswith("feedback_view:"), is_owner)
 async def admin_feedback_view(call: CallbackQuery):
     """Просмотр полного текста отзыва."""
@@ -465,12 +466,9 @@ async def admin_feedback_view(call: CallbackQuery):
         await call.answer("❌ Ошибка ID", show_alert=True)
         return
     
-    # Получаем полный отзыв
-    db.cursor.execute(
-        "SELECT user_id, feedback_text, created_at, is_read FROM feedback WHERE id = ?",
-        (fb_id,)
-    )
-    row = db.cursor.fetchone()
+    # ✅ Используем метод БД вместо прямого cursor.execute
+    row = await asyncio.to_thread(db.get_feedback_by_id, fb_id)
+    
     if not row:
         await call.answer("❌ Отзыв не найден", show_alert=True)
         return
