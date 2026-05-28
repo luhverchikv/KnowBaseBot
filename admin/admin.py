@@ -14,11 +14,20 @@ from utils.numeric_keyboard import numeric_keyboard
 from utils.logger import logger
 from aiogram.exceptions import TelegramBadRequest
 from admin.export import create_excel_report
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+
+
+class LimitEditStates(StatesGroup):
+    waiting_category = State()  # Выбор категории лимита
+    waiting_value = State()     # Ввод нового значения
+
 
 router = Router()
 db = Database()
 USERS_PER_PAGE = 10
 FEEDBACK_PER_PAGE = 5
+
 
 # Текст приветствия администратора
 ADMIN_WELCOME = """
@@ -200,17 +209,6 @@ async def admin_user_info_handler(call: CallbackQuery):
 
 
 
-# admin/admin.py (добавить в начало файла)
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-
-# ... после импортов ...
-
-class LimitEditStates(StatesGroup):
-    waiting_category = State()  # Выбор категории лимита
-    waiting_value = State()     # Ввод нового значения
-
-# ... внутри admin.py, после существующих хендлеров ...
 
 @router.callback_query(F.data.startswith("admin_edit_limits"), is_owner)
 async def admin_edit_limits_start(call: CallbackQuery, state: FSMContext):
