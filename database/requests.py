@@ -35,3 +35,18 @@ async def set_user_difficulty(user_id: int, difficulty: str) -> None:
 
 
 # ==== управление файлами ========
+async def get_user_max_file_size(user_id: int) -> float:
+    """
+    Возвращает максимальный разрешенный размер файла (в МБ) для конкретного пользователя.
+    """
+    async with async_session() as session:
+        # Получаем значение конкретного столбца max_file_size_mb
+        result = await session.execute(
+            select(User.max_file_size_mb).where(User.user_id == user_id)
+        )
+        max_size = result.scalar_one_or_none()
+        
+        # Если пользователь найден, возвращаем его лимит, иначе дефолтное значение
+        return max_size if max_size is not None else 0.25
+
+
