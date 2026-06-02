@@ -14,7 +14,7 @@ from logic.feedback import router as feedback_router
 from menu.settings import router as settings_router
 from utils.scheduler import setup_reminder_scheduler
 #from voice_engine.handler import router as voice_router
-from database.engine import init_db
+from database.models import init_db
 
 
 async def main():
