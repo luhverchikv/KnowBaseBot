@@ -2,13 +2,12 @@
 import os
 import asyncio
 from pathlib import Path
-from logic.manage.db import Database
+from database import get_user_max_file_size
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
-db = Database()
 BASE_DIR = Path("database")
 
 # ✅ Разрешённые расширения (только markdown)
@@ -75,7 +74,7 @@ async def handle_manage(message: Message):
 async def cb_upload(call: CallbackQuery):
     await call.answer()
     user_id = call.message.from_user.id
-    max_size_mb = await asyncio.to_thread(db.get_user_max_file_size, user_id)
+    max_size_mb = await get_user_max_file_size(user_id)
     await call.message.edit_text(
         "📤 <b>Загрузка файла</b>\n\n"
         "Отправьте файл (markdown).\n"
