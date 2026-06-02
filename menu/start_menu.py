@@ -6,7 +6,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery, KeyboardButton, InlineKeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from logic.manage.db import Database
-from database.request import set_user
+from database.requests import set_user, set_user_difficulty 
 
 router = Router()
 #db = Database()
