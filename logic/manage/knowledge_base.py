@@ -2,7 +2,7 @@
 import os
 import asyncio
 from pathlib import Path
-from database import get_user_max_file_size
+from database import get_user_max_file_size, add_file_to_db, get_user_max_files
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -162,6 +162,7 @@ async def cb_manage_back(call: CallbackQuery):
         parse_mode="HTML"
     )
 
+
 # ===================== DOCUMENT HANDLER =====================
 @router.message(F.document)
 async def handle_document_upload(message: Message):
@@ -169,6 +170,13 @@ async def handle_document_upload(message: Message):
     filename = doc.file_name or "unknown"
     user_id = message.from_user.id
     
+    # Заранее подготовим безопасное удаление сообщения пользователя в конце или при ошибке
+    async def safe_delete_message():
+        try:
+            await message.delete()
+        except TelegramBadRequest:
+            pass
+
     # ✅ 1. Проверка расширения файла
     _, ext = os.path.splitext(filename.lower())
     if ext not in ALLOWED_EXTENSIONS:
@@ -178,33 +186,27 @@ async def handle_document_upload(message: Message):
             f"Ваш файл: <code>{filename}</code>",
             parse_mode="HTML"
         )
-        await message.delete()
+        await safe_delete_message()
         return
     
-    
-    
-    # ✅ Получаем лимит из БД (в МБ)
-    max_size_mb = await asyncio.to_thread(db.get_user_max_file_size, user_id)
-    # Переводим МБ в байты (1 МБ = 1024 * 1024 байт)
+    # ✅ 2. Получаем лимит размера из БД напрямую через ORM
+    max_size_mb = await get_user_max_file_size(user_id)
     max_size_bytes = max_size_mb * 1024 * 1024
 
-    # 2. Проверка размера
+    # Проверка размера
     if doc.file_size and doc.file_size > max_size_bytes:
-        # ✅ Выводим пользователю актуальный лимит
         await message.answer(
             f"❌ Файл слишком большой.\n"
             f"Ваш лимит: <b>{max_size_mb} МБ</b>.\n"
             f"Размер файла: {doc.file_size / (1024 * 1024):.2f} МБ",
             parse_mode="HTML"
         )
-        await message.delete()
+        await safe_delete_message()
         return
 
-    
-    
-    # 3. Проверка лимита файлов
-    max_files = await asyncio.to_thread(db.get_user_max_files, user_id)
-    current_files = await asyncio.to_thread(_list_files, user_id)
+    # ✅ 3. Получаем лимит количества файлов из БД напрямую через ORM
+    max_files = await get_user_max_files(user_id)
+    current_files = await asyncio.to_thread(_list_files, user_id) # Оставляем в потоке, т.к. это работа с диском os.listdir
     
     if len(current_files) >= max_files:
         await message.answer(
@@ -213,10 +215,10 @@ async def handle_document_upload(message: Message):
             "Удалите ненужные файлы через раздел «🗑️ Удалить», чтобы загрузить новые.",
             parse_mode="HTML"
         )
-        await message.delete()
+        await safe_delete_message()
         return
 
-    # 4. ✅ Проверка на существование файла
+    # 4. ✅ Проверка на существование файла на диске
     user_dir = _get_user_dir(user_id)
     dest_path = user_dir / filename
     
@@ -229,18 +231,24 @@ async def handle_document_upload(message: Message):
             f"• Или переименуйте файл перед загрузкой",
             parse_mode="HTML"
         )
-        await message.delete()
+        await safe_delete_message()
         return
 
-    # 5. Сохранение файла
+    # 5. Сохранение файла на диск
     await message.bot.download(doc, destination=dest_path)
+    
+    # 🔥 5.5 Запись информации о файле в базу данных через ORM
+    await add_file_to_db(
+        user_id=user_id, 
+        filename=filename, 
+        file_path=str(dest_path)
+    )
     
     # 6. Успешный ответ с остатком слотов
     remaining = max_files - len(current_files) - 1
     await message.answer(
-        f"✅ Файл <code>{dest_path.name}</code> успешно сохранён.\n"
+        f"✅ Файл <code>{filename}</code> успешно сохранён.\n"
         f"📊 Осталось свободных слотов: <b>{remaining}</b> из {max_files}.",
         parse_mode="HTML"
     )
-    await message.delete()
-
+    await safe_delete_message()
