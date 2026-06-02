@@ -7,8 +7,9 @@ from aiogram.types import Message, CallbackQuery, KeyboardButton, InlineKeyboard
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from logic.manage.db import Database
 from database.request import set_user
+
 router = Router()
-db = Database()
+#db = Database()
 
 def start_keyboard():
     builder = ReplyKeyboardBuilder()
@@ -50,13 +51,10 @@ async def command_start(message: Message) -> None:
     user_id = message.from_user.id
     user_dir = Path("database") / str(user_id)
     # новая функция
-    await set_user(message.from_user.id)
+    is_new = await set_user(message.from_user.id)
+    await asyncio.to_thread(user_dir.mkdir, parents=True, exist_ok=True)
     
-    is_new = not await asyncio.to_thread(db.user_exists, user_id)
     if is_new:
-        await asyncio.to_thread(db.add_user, user_id)
-        await asyncio.to_thread(user_dir.mkdir, parents=True, exist_ok=True)
-        
         # ✅ Для нового пользователя сначала просим выбрать сложность
         await message.answer(
             "🎯 <b>Добро пожаловать!</b>\n\n"
