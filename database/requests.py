@@ -50,3 +50,30 @@ async def get_user_max_file_size(user_id: int) -> float:
         return max_size if max_size is not None else 0.25
 
 
+async def get_user_max_files(user_id: int) -> int:
+    """
+    Возвращает максимальное количество файлов, разрешенное пользователю.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.max_files).where(User.user_id == user_id)
+        )
+        max_files = result.scalar_one_or_none()
+        
+        # Если пользователь найден, возвращаем его лимит, иначе дефолтное значение 3
+        return max_files if max_files is not None else 3
+
+
+async def add_file_to_db(user_id: int, filename: str, file_path: str) -> None:
+    """
+    Добавляет информацию о загруженном файле в таблицу files.
+    """
+    async with async_session() as session:
+        new_file = File(
+            user_id=user_id,
+            filename=filename,
+            file_path=str(file_path),
+            description="Краткое описание"  # По вашему ТЗ пока заглушка
+        )
+        session.add(new_file)
+        await session.commit()
