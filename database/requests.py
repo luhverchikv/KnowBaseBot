@@ -8,3 +8,5 @@ async def set_user(user_id):
         if not user:
             session.add(User(user_id=user_id))
             await session.commit()
+            retern True
+        return False
