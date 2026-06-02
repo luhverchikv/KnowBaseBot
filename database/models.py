@@ -1,8 +1,30 @@
 # database/models.py
+import os
+import asyncio
 from datetime import datetime
 from sqlalchemy import BigInteger, DateTime, String, Text, Integer, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column
-from .engine import Base
+from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+
+
+# Асинхронный движок
+engine = create_async_engine(
+    DB_URL=os.getenv('DB_URL'),
+    echo=False,  # Поставьте True для отладки SQL-запросов
+    pool_pre_ping=True
+)
+
+# Фабрика сессий. expire_on_commit=False критичен для aiogram,
+# чтобы объекты не теряли состояние после commit
+async_session = async_sessionmaker(
+    engine, 
+    class_=AsyncSession, 
+    expire_on_commit=False
+)
+
+# Базовый класс для моделей
+Base = DeclarativeBase()
+
 
 # ==========================================
 # 👤 Пользователи
@@ -83,3 +105,9 @@ class File(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
+
+async def init_db():
+    """Создаёт таблицы, если их нет"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ База данных и таблицы инициализированы")
