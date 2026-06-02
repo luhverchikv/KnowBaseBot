@@ -5,11 +5,11 @@ from aiogram import Router, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery, KeyboardButton, InlineKeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
-from logic.manage.db import Database
 from database.requests import set_user, set_user_difficulty 
 
+
 router = Router()
-#db = Database()
+
 
 def start_keyboard():
     builder = ReplyKeyboardBuilder()
@@ -45,6 +45,7 @@ start_text = """
 Выберите нужный раздел в меню ниже:
 """
 
+
 @router.message(CommandStart())
 async def command_start(message: Message) -> None:
     await message.delete()
@@ -65,7 +66,6 @@ async def command_start(message: Message) -> None:
         return
 
     # ✅ Для существующего пользователя сразу показываем меню
-    await asyncio.to_thread(user_dir.mkdir, parents=True, exist_ok=True)
     await message.answer(
         text=start_text,
         reply_markup=start_keyboard(),
@@ -79,7 +79,7 @@ async def handle_difficulty_selection(call: CallbackQuery):
     user_id = call.from_user.id
     difficulty = call.data.split("_")[1]  # easy, medium, hard
     
-    await asyncio.to_thread(db.set_user_difficulty, user_id, difficulty)
+    await set_user_difficulty(user_id, difficulty)
     
     diff_names = {"easy": "😊 Легкий", "medium": "🤔 Средний", "hard": "😈 Сложный"}
     selected_name = diff_names.get(difficulty, difficulty)
@@ -95,15 +95,6 @@ async def handle_difficulty_selection(call: CallbackQuery):
         text=start_text,
         reply_markup=start_keyboard(),
         parse_mode="HTML"
-    )
-
-@router.message(F.text == '/help')
-async def user_help_handler(message: Message):
-    await message.delete()
-    await message.answer(
-        "Мы на связи для вас!\n\n"
-        "Если у вас есть замечание или идея для улучшения рабочих процессов, а может просто хотите поделиться своим мнением — напишите нам.\n"
-        "Спасибо, что помогаете нам становиться лучше! ❤️\n\n"
     )
 
 
