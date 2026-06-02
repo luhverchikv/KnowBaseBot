@@ -6,7 +6,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery, KeyboardButton, InlineKeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from logic.manage.db import Database
-
+from database.request import set_user
 router = Router()
 db = Database()
 
@@ -49,6 +49,8 @@ async def command_start(message: Message) -> None:
     await message.delete()
     user_id = message.from_user.id
     user_dir = Path("database") / str(user_id)
+    # новая функция
+    await set_user(message.from_user.id)
     
     is_new = not await asyncio.to_thread(db.user_exists, user_id)
     if is_new:
