@@ -584,6 +584,6 @@ async def get_user_quiz_export_data_list(user_id: int, days: int = 30) -> List[D
                 "user_answer": q.user_answer,
                 "correctness": q.correctness,
                 "rating": q.rating,
-                "explanation": q.explanation
+                "explanation": q.feedback
             })
         return data_list
