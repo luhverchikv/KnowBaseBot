@@ -116,6 +116,32 @@ class AIConnector:
         system = "Return strictly valid JSON with keys: 'correctness' (one of: 'правильно','частично','неправильно'), 'feedback' (short explanation in Russian), 'rating' (1-5)."
         prompt = f"Question: {question}\nCorrect: {correct}\nUser: {user}\nEvaluate and return JSON only."
         return await self._call_api(system, prompt)
+    
+    
+    async def generate_file_description(self, md_text: str) -> Tuple[bool, Optional[str], str, Optional[TokenUsage]]:
+        """
+        Генерирует краткое описание (summary) для загруженного markdown-файла.
+        Возвращает: (success, description_text, error_message, token_usage)
+        """
+        system = (
+            "Вы — ассистент базы знаний. Проанализируйте текст и составьте его очень краткое описание "
+            "на русском языке (1-2 предложения, максимум 150 символов), отражающее суть документа.\n"
+            "Верните ответ СТРОГО в формате JSON с единственным ключом 'description'. Никакого другого текста."
+        )
+        # Ограничиваем срез текста, чтобы не выйти за лимиты токенов
+        safe_text = md_text[:4000]
+        prompt = f"Составь краткое описание для следующего текста:\n\n{safe_text}"
+        
+        # Вызываем универсальный метод API
+        success, data, error, token_usage = await self._call_api(system, prompt)
+        
+        if success and data and "description" in data:
+            return True, data["description"], "", token_usage
+        
+        # Если ИИ вернул JSON, но без нужного ключа, или произошла ошибка API
+        err_msg = error or "ИИ не вернул ключ 'description' в JSON."
+        return False, None, err_msg, token_usage
+
 
     async def close(self):
         # В AsyncOpenAI нет явного метода close, сессии закрываются автоматически при сборке мусора,
