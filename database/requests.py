@@ -155,7 +155,7 @@ async def get_daily_questions_count(user_id: int) -> int:
                 QuizQuestion.generated_at >= start_of_day
             )
         )
-        return result.scalar_or_none() or 0
+        return result.scalar() or 0
 
 # --- Работа с вопросами квиза через ORM ---
 
