@@ -1,10 +1,10 @@
 # database/requests.py
 from database.models import async_session, User, QuizQuestion, Feedback, File
-from sqlalchemy import select, update, delete, func, update
+from sqlalchemy import select, update, delete, func, update, case, desc
 import random
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from logic.ai_connector import TokenUsage
-
+from typing import Dict, Any
 
 
 # ==== работа с пользователем ===
@@ -248,3 +248,76 @@ async def set_user_reminders(user_id: int, reminders: int) -> None:
         )
         await session.execute(stmt)
         await session.commit()
+
+
+async def get_user_analytics_data(user_id: int, days: int = None) -> Dict[str, Any]:
+    """
+    Асинхронно собирает агрегированную аналитику по вопросам викторины для пользователя.
+    """
+    async with async_session() as session:
+        # Базовое условие фильтрации по ID пользователя
+        base_filters = [QuizQuestion.user_id == user_id]
+        
+        # Если задан период в днях, рассчитываем стартовую дату
+        if days is not None:
+            start_date = datetime.now() - timedelta(days=days)
+            base_filters.append(QuizQuestion.generated_at >= start_date)
+
+        # 1. Запрос общих показателей и точности ответов
+        # Используем конструкцию case() аналогично старому CASE WHEN в SQL
+        stats_stmt = (
+            select(
+                func.count(QuizQuestion.id).label("total"),
+                func.avg(QuizQuestion.rating).label("avg_rating"),
+                func.sum(case((QuizQuestion.correctness == "правильно", 1), else_=0)).label("correct"),
+                func.sum(case((QuizQuestion.correctness == "частично", 1), else_=0)).label("partial"),
+                func.sum(case((QuizQuestion.correctness == "неправильно", 1), else_=0)).label("wrong")
+            )
+            .where(*base_filters)
+        )
+        stats_result = await session.execute(stats_stmt)
+        stats_row = stats_result.one_or_none()
+
+        # 2. Топ-3 файлов по активности генераций
+        top_files_stmt = (
+            select(
+                QuizQuestion.source_file,
+                func.count(QuizQuestion.id).label("cnt")
+            )
+            .where(*base_filters)
+            .group_by(QuizQuestion.source_file)
+            .order_by(desc("cnt"))
+            .limit(3)
+        )
+        top_files_result = await session.execute(top_files_stmt)
+        top_files = [(row.source_file, row.cnt) for row in top_files_result.all()]
+
+        # 3. Динамика по дням (для отображения мини-графика за последние максимум 7 дней)
+        limit_days = min(days, 7) if days else 7
+        timeline_start = datetime.now() - timedelta(days=limit_days)
+        
+        # Функция func.date() извлекает только дату YYYY-MM-DD
+        date_label = func.date(QuizQuestion.generated_at).label("day")
+        
+        daily_stmt = (
+            select(
+                date_label,
+                func.count(QuizQuestion.id).label("cnt"),
+                func.avg(QuizQuestion.rating).label("avg_r")
+            )
+            .where(QuizQuestion.user_id == user_id, QuizQuestion.generated_at >= timeline_start)
+            .group_by(date_label)
+            .order_by(date_label)
+        )
+        daily_result = await session.execute(daily_stmt)
+        daily_data = [(row.day, row.cnt, row.avg_r) for row in daily_result.all()]
+
+        return {
+            'total': stats_row.total if stats_row else 0,
+            'avg_rating': round(stats_row.avg_rating, 2) if stats_row and stats_row.avg_rating else 0.0,
+            'correct': stats_row.correct if stats_row and stats_row.correct else 0,
+            'partial': stats_row.partial if stats_row and stats_row.partial else 0,
+            'wrong': stats_row.wrong if stats_row and stats_row.wrong else 0,
+            'top_files': top_files,
+            'daily': daily_data
+        }
