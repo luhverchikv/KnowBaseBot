@@ -1,21 +1,20 @@
 # database/models.py
-import os
-import asyncio
 from datetime import datetime
-from sqlalchemy import BigInteger, DateTime, String, Text, Integer, ForeignKey
+from sqlalchemy import BigInteger, DateTime, String, Text, Integer, Float, ForeignKey, CheckConstraint, text, func
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
+# Импортируем собранный объект конфигурации
+from config import config
 
-# Асинхронный движок
+# Асинхронный движок теперь безопасно получает URL из config.py
 engine = create_async_engine(
-    DB_URL=os.getenv('DB_URL'),
-    echo=False,  # Поставьте True для отладки SQL-запросов
+    url=config.db.url,  # Передача URL через именованный параметр url
+    echo=False,         # Поставьте True для отладки SQL-запросов в консоли
     pool_pre_ping=True
 )
 
-# Фабрика сессий. expire_on_commit=False критичен для aiogram,
-# чтобы объекты не теряли состояние после commit
+# Фабрика сессий
 async_session = async_sessionmaker(
     engine, 
     class_=AsyncSession, 
@@ -89,21 +88,20 @@ class Feedback(Base):
     is_read: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     
     
-    
-    
 # ==========================================
 # 💾 Файлы
 # ==========================================
-
 class File(Base):
     __tablename__ = "files"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
-    filename: Mapped[str] = mapped_column(String(500))
-    file_path: Mapped[str] = mapped_column(String(1000))
+    # Исправлено на ForeignKey("users.user_id") для полной синхронизации с другими таблицами проекта
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
+    filename: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # Переведено на серверное время func.now() для стабильной работы СУБД
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
 
 async def init_db():
