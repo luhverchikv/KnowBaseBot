@@ -4,7 +4,7 @@ from sqlalchemy import select, update, delete, func, update, case, desc, and_
 import random
 from datetime import datetime, time, timedelta
 from logic.ai_connector import TokenUsage
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple, Optional
 
 
 # ==== работа с пользователем ===
@@ -417,3 +417,173 @@ async def get_daily_summary_data() -> Dict[str, Any]:
                 'total_tokens': t_gen + t_eval
             }
         }
+
+
+
+# --- 1. Статистика и Счетчики ---
+
+async def get_unread_feedback_count() -> int:
+    """Возвращает количество непрочитанных отзывов."""
+    async with async_session() as session:
+        return await session.scalar(select(func.count(Feedback.id)).where(Feedback.is_read == 0)) or 0
+
+async def get_total_users_count() -> int:
+    """Возвращает общее количество пользователей."""
+    async with async_session() as session:
+        return await session.scalar(select(func.count(User.id))) or 0
+
+async def get_questions_count_by_period(start_date: datetime, end_date: datetime) -> int:
+    """Возвращает количество вопросов, сгенерированных за указанный период времени."""
+    async with async_session() as session:
+        stmt = select(func.count(QuizQuestion.id)).where(
+            and_(QuizQuestion.generated_at >= start_date, QuizQuestion.generated_at < end_date)
+        )
+        return await session.scalar(stmt) or 0
+
+async def get_global_token_stats(user_id: Optional[int] = None, days: Optional[int] = None) -> Dict[str, int]:
+    """
+    Возвращает статистику по использованию токенов.
+    Если передан user_id — считает по конкретному пользователю.
+    Если передан days — фильтрует за последние N дней.
+    """
+    async with async_session() as session:
+        filters = []
+        if user_id is not None:
+            filters.append(QuizQuestion.user_id == user_id)
+        if days is not None:
+            start_date = datetime.now() - timedelta(days=days)
+            filters.append(QuizQuestion.generated_at >= start_date)
+
+        stmt = select(
+            func.sum(QuizQuestion.gen_total_tokens).label("gen"),
+            func.sum(QuizQuestion.eval_total_tokens).label("eval")
+        )
+        if filters:
+            stmt = stmt.where(and_(*filters))
+
+        res = (await session.execute(stmt)).one_or_none()
+        gen = int(res.gen or 0) if res else 0
+        eval_tokens = int(res.eval or 0) if res else 0
+
+        return {
+            "generation": gen,
+            "evaluation": eval_tokens,
+            "total": gen + eval_tokens
+        }
+
+# --- 2. Пользователи и Лимиты ---
+
+async def get_users_paginated(limit: int, offset: int) -> List[int]:
+    """Возвращает список Telegram ID пользователей с пагинацией."""
+    async with async_session() as session:
+        stmt = select(User.user_id).order_by(User.id.desc()).limit(limit).offset(offset)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+async def get_user_profile_counters(user_id: int) -> Tuple[int, int]:
+    """Возвращает (количество_вопросов, количество_файлов) для конкретного пользователя."""
+    async with async_session() as session:
+        # Импортируйте модель File из database.models, если она там объявлена
+        from database.models import File  
+        
+        q_count = await session.scalar(select(func.count(QuizQuestion.id)).where(QuizQuestion.user_id == user_id)) or 0
+        f_count = await session.scalar(select(func.count(File.id)).where(File.user_id == user_id)) or 0
+        return q_count, f_count
+
+async def get_user_limits_dict(user_id: int) -> Dict[str, Any]:
+    """Возвращает лимиты пользователя в виде словаря."""
+    async with async_session() as session:
+        user = await session.scalar(select(User).where(User.user_id == user_id))
+        if not user:
+            return {"max_questions_per_day": 0, "max_files": 0, "max_file_size_mb": 0.0}
+        
+        return {
+            "max_questions_per_day": getattr(user, "max_questions_per_day", 20),
+            "max_files": getattr(user, "max_files", 5),
+            "max_file_size_mb": getattr(user, "max_file_size_mb", 10.0)
+        }
+
+async def update_user_limit_value(user_id: int, field: str, value: Any) -> bool:
+    """Обновляет указанный лимит пользователя."""
+    async with async_session() as session:
+        stmt = update(User).where(User.user_id == user_id).values({field: value})
+        await session.execute(stmt)
+        await session.commit()
+        return True
+
+# --- 3. Отзывы ---
+
+async def get_feedback_paginated(limit: int, offset: int) -> List[Tuple[int, int, str, str, int]]:
+    """Возвращает пагинированный список отзывов вместе с Telegram ID пользователя."""
+    async with async_session() as session:
+        stmt = (
+            select(
+                Feedback.id, 
+                Feedback.user_id, 
+                Feedback.feedback_text, 
+                Feedback.created_at, 
+                User.user_id.label("tg_id")
+            )
+            .join(User, Feedback.user_id == User.user_id, isouter=True)
+            .order_by(Feedback.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await session.execute(stmt)
+        
+        feedbacks = []
+        for row in result.all():
+            created_str = row.created_at.strftime("%d.%m.%Y %H:%M") if row.created_at else ""
+            feedbacks.append((row.id, row.user_id, row.feedback_text, created_str, row.tg_id))
+        return feedbacks
+
+async def get_feedback_by_id(fb_id: int) -> Optional[Tuple[int, str, str, int]]:
+    """Возвращает детальную информацию об отзыве."""
+    async with async_session() as session:
+        fb = await session.scalar(select(Feedback).where(Feedback.id == fb_id))
+        if fb:
+            created_str = fb.created_at.strftime("%d.%m.%Y %H:%M") if fb.created_at else ""
+            # Возвращаем в том же порядке: user_id, feedback_text, created_at, is_read
+            is_read_val = 1 if fb.is_read else 0
+            return fb.user_id, fb.feedback_text, created_str, is_read_val
+        return None
+
+async def mark_feedback_read(fb_id: int) -> None:
+    """Помечает отзыв как прочитанный."""
+    async with async_session() as session:
+        await session.execute(update(Feedback).where(Feedback.id == fb_id).values(is_read=1))
+        await session.commit()
+
+async def delete_feedback_by_id(fb_id: int) -> bool:
+    """Удаляет отзыв из базы данных."""
+    async with async_session() as session:
+        await session.execute(delete(Feedback).where(Feedback.id == fb_id))
+        await session.commit()
+        return True
+
+# --- 4. Экспорт ---
+
+async def get_user_quiz_export_data_list(user_id: int, days: int = 30) -> List[Dict[str, Any]]:
+    """Получает результаты викторин пользователя за последние N дней для экспорта в Excel."""
+    async with async_session() as session:
+        start_date = datetime.now() - timedelta(days=days)
+        stmt = (
+            select(QuizQuestion)
+            .where(and_(QuizQuestion.user_id == user_id, QuizQuestion.generated_at >= start_date))
+            .order_by(QuizQuestion.generated_at.desc())
+        )
+        result = await session.execute(stmt)
+        questions = result.scalars().all()
+        
+        data_list = []
+        for q in questions:
+            data_list.append({
+                "generated_at": q.generated_at.strftime("%Y-%m-%d %H:%M:%S") if q.generated_at else "",
+                "source_file": q.source_file,
+                "question_text": q.question_text,
+                "user_answer": q.user_answer,
+                "correctness": q.correctness,
+                "rating": q.rating,
+                "explanation": q.explanation
+            })
+        return data_list
