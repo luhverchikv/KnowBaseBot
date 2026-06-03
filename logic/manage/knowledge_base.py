@@ -1,6 +1,7 @@
 # logic/manage/knowledge_base.py
 import os
 import asyncio
+import aiofiles
 from pathlib import Path
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton
@@ -16,6 +17,7 @@ from database.requests import (
     get_file_by_id, 
     delete_file_from_db
 )
+from logic.ai_connector import ai_client 
 
 router = Router()
 BASE_DIR = Path("database")
