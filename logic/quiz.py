@@ -3,7 +3,7 @@ import os
 import asyncio
 from pathlib import Path
 import aiofiles  # Для асинхронного неблокирующего чтения файлов
-
+import random
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
