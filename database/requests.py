@@ -1,5 +1,5 @@
 # database/requests.py
-from database.models import async_session, User, Category, Item
+from database.models import async_session, User, Category, Item, QuizQuestion, Feedback, File
 from sqlalchemy import select, update, delete
 
 
