@@ -563,18 +563,29 @@ async def delete_feedback_by_id(fb_id: int) -> bool:
 
 # --- 4. Экспорт ---
 async def get_user_quiz_export_data_list(user_id: int, days: int = 30) -> List[Dict[str, Any]]:
-    ...
-    for q in questions:
-        data_list.append({
-            "generated_at": q.generated_at.strftime("%Y-%m-%d %H:%M:%S") if q.generated_at else "",
-            "source_file": q.source_file,
-            "question": q.question,           # Исправлено
-            "correct_answer": q.correct_answer, # Добавлено
-            "user_answer": q.user_answer,
-            "correctness": q.correctness,
-            "rating": q.rating or 0,
-            "feedback": q.feedback or "",      # Исправлено
-            "gen_tokens": q.gen_total_tokens or 0,  # Добавлено
-            "eval_tokens": q.eval_total_tokens or 0  # Добавлено
-        })
-    return data_list
+    """Получает результаты викторин пользователя за последние N дней для экспорта в Excel."""
+    async with async_session() as session:
+        start_date = datetime.now() - timedelta(days=days)
+        stmt = (
+            select(QuizQuestion)
+            .where(and_(QuizQuestion.user_id == user_id, QuizQuestion.generated_at >= start_date))
+            .order_by(QuizQuestion.generated_at.desc())
+        )
+        result = await session.execute(stmt)
+        questions = result.scalars().all()
+
+        data_list = []
+        for q in questions:
+            data_list.append({
+                "generated_at": q.generated_at.strftime("%Y-%m-%d %H:%M:%S") if q.generated_at else "",
+                "source_file": q.source_file,
+                "question": q.question,
+                "correct_answer": q.correct_answer,
+                "user_answer": q.user_answer,
+                "correctness": q.correctness,
+                "rating": q.rating or 0,
+                "feedback": q.feedback or "",
+                "gen_tokens": q.gen_total_tokens or 0,
+                "eval_tokens": q.eval_total_tokens or 0
+            })
+        return data_list
