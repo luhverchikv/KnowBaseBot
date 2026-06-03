@@ -6,6 +6,7 @@ from datetime import datetime, time
 from logic.ai_connector import TokenUsage
 
 
+
 # ==== работа с пользователем ===
 async def set_user(user_id):
     async with async_session() as session:
@@ -197,4 +198,18 @@ async def update_quiz_result(q_id: int, user_answer: str, correctness: str, feed
             )
         )
         await session.execute(stmt)
+        await session.commit()
+
+# ==== работа с отзывами ====
+async def save_feedback(user_id: int, feedback_text: str) -> None:
+    """
+    Асинхронно сохраняет отзыв пользователя в базу данных.
+    Поля id, created_at (func.now()) и is_read (server_default=0) заполняются автоматически на стороне СУБД.
+    """
+    async with async_session() as session:
+        new_feedback = Feedback(
+            user_id=user_id,
+            feedback_text=feedback_text
+        )
+        session.add(new_feedback)
         await session.commit()
