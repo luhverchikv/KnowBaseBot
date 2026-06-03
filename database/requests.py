@@ -140,14 +140,8 @@ async def get_user_max_questions_per_day(user_id: int) -> int:
         val = result.scalar_one_or_none()
         return val if val is not None else 5
 
-async def get_user_difficulty(user_id: int) -> str:
-    """Получает уровень сложности пользователя ('easy', 'medium', 'hard')."""
-    async with async_session() as session:
-        result = await session.execute(
-            select(User.difficulty).where(User.user_id == user_id)
-        )
-        val = result.scalar_one_or_none()
-        return val if val is not None else "medium"
+
+
 
 async def get_daily_questions_count(user_id: int) -> int:
     """Считает количество сгенерированных вопросов для пользователя за текущие сутки."""
@@ -212,4 +206,45 @@ async def save_feedback(user_id: int, feedback_text: str) -> None:
             feedback_text=feedback_text
         )
         session.add(new_feedback)
+        await session.commit()
+
+
+async def get_user_difficulty(user_id: int) -> str:
+    """Получает уровень сложности пользователя ('easy', 'medium', 'hard')."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.difficulty).where(User.user_id == user_id)
+        )
+        val = result.scalar_one_or_none()
+        return val if val is not None else "medium"
+
+async def set_user_difficulty(user_id: int, difficulty: str) -> None:
+    """Обновляет уровень сложности пользователя в БД."""
+    async with async_session() as session:
+        stmt = (
+            update(User)
+            .where(User.user_id == user_id)
+            .values(difficulty=difficulty)
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+async def get_user_reminders(user_id: int) -> int:
+    """Получает статус напоминаний пользователя (0 или 1)."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.reminders).where(User.user_id == user_id)
+        )
+        val = result.scalar_one_or_none()
+        return val if val is not None else 0
+
+async def set_user_reminders(user_id: int, reminders: int) -> None:
+    """Обновляет статус напоминаний пользователя в БД."""
+    async with async_session() as session:
+        stmt = (
+            update(User)
+            .where(User.user_id == user_id)
+            .values(reminders=reminders)
+        )
+        await session.execute(stmt)
         await session.commit()
