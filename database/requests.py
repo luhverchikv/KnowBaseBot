@@ -64,7 +64,7 @@ async def get_user_max_files(user_id: int) -> int:
         return max_files if max_files is not None else 3
 
 
-async def add_file_to_db(user_id: int, filename: str, file_path: str) -> None:
+async def add_file_to_db(user_id: int, filename: str, file_path: str, description: str = "Краткое описание") -> None:
     """
     Добавляет информацию о загруженном файле в таблицу files.
     """
@@ -73,7 +73,7 @@ async def add_file_to_db(user_id: int, filename: str, file_path: str) -> None:
             user_id=user_id,
             filename=filename,
             file_path=str(file_path),
-            description="Краткое описание"  # По вашему ТЗ пока заглушка
+            description=description  # Теперь записывается сгенерированное ИИ описание
         )
         session.add(new_file)
         await session.commit()
