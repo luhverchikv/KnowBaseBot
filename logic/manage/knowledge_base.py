@@ -267,11 +267,10 @@ async def handle_document_upload(message: Message):
         await safe_delete_message()
         return
     
-    # ✅ 2. Получаем лимит размера из БД напрямую через ORM
+    # ✅ 2. Проверка лимита размера из БД
     max_size_mb = await get_user_max_file_size(user_id)
     max_size_bytes = max_size_mb * 1024 * 1024
 
-    # Проверка размера
     if doc.file_size and doc.file_size > max_size_bytes:
         await message.answer(
             f"❌ Файл слишком большой.\n"
@@ -282,7 +281,7 @@ async def handle_document_upload(message: Message):
         await safe_delete_message()
         return
 
-    # ✅ 3. Проверка лимита количества файлов (полностью через ORM)
+    # ✅ 3. Проверка лимита количества файлов
     max_files = await get_user_max_files(user_id)
     user_files = await get_user_files(user_id)
     current_files_count = len(user_files)
@@ -313,20 +312,47 @@ async def handle_document_upload(message: Message):
         await safe_delete_message()
         return
 
+    # Отправляем промежуточный статус пользователю, так как генерация ИИ занимает пару секунд
+    status_msg = await message.answer("⏳ <i>Загрузка и анализ файла нейросетью... Пожалуйста, подождите.</i>", parse_mode="HTML")
+
     # 5. Сохранение файла на диск
     await message.bot.download(doc, destination=dest_path)
     
-    # 🔥 5.5 Запись информации о файле в базу данных через ORM
+    # 🔥 5.1 Асинхронное чтение сохраненного файла для отправки в ИИ
+    file_content = ""
+    try:
+        async with aiofiles.open(dest_path, mode='r', encoding='utf-8', errors='ignore') as f:
+            file_content = await f.read()
+    except Exception as e:
+        file_content = ""
+
+    # 🔥 5.2 Генерация описания через ИИ
+    description = "Краткое описание отсутствует или не удалось сгенерировать."
+    if file_content.strip():
+        # Вызываем новый метод генерации
+        success, ai_desc, _, _ = await ai_client.generate_file_description(file_content)
+        if success and ai_desc:
+            description = ai_desc
+
+    # 🔥 5.3 Запись информации о файле в базу данных вместе со сгенерированным описанием
     await add_file_to_db(
         user_id=user_id, 
         filename=filename, 
-        file_path=str(dest_path)
+        file_path=str(dest_path),
+        description=description  # Передаем описание сюда
     )
     
+    # Удаляем промежуточный статус "Загрузка и анализ..."
+    try:
+        await status_msg.delete()
+    except Exception:
+        pass
+
     # 6. Успешный ответ с остатком слотов
     remaining = max_files - current_files_count - 1
     await message.answer(
         f"✅ Файл <code>{filename}</code> успешно сохранён.\n"
+        f"📝 <b>Описание ИИ:</b> <i>{description}</i>\n"
         f"📊 Осталось свободных слотов: <b>{remaining}</b> из {max_files}.",
         parse_mode="HTML"
     )
