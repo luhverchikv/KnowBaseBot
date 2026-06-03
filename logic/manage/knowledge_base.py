@@ -2,11 +2,20 @@
 import os
 import asyncio
 from pathlib import Path
-from database import (get_user_max_file_size, add_file_to_db, get_user_max_files, 
-get_user_files, get_file_by_id, delete_file_from_db)
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.exceptions import TelegramBadRequest
+
+# Исправлен путь импорта функций БД
+from database.requests import (
+    get_user_max_file_size, 
+    add_file_to_db, 
+    get_user_max_files, 
+    get_user_files, 
+    get_file_by_id, 
+    delete_file_from_db
+)
 
 router = Router()
 BASE_DIR = Path("database")
@@ -15,6 +24,7 @@ BASE_DIR = Path("database")
 ALLOWED_EXTENSIONS = {".md", ".markdown"}
 
 def _physical_delete(path_str: str) -> bool:
+    """Удаляет файл физически с диска."""
     path = Path(path_str)
     if path.exists():
         path.unlink()
@@ -27,25 +37,6 @@ def _get_user_dir(user_id: int) -> Path:
     user_dir.mkdir(parents=True, exist_ok=True)
     return user_dir
 
-
-def _list_files(user_id: int) -> list[str]:
-    """Возвращает отсортированный список .md файлов пользователя."""
-    user_dir = _get_user_dir(user_id)
-    # ✅ Фильтруем только разрешённые расширения
-    return sorted([
-        f.name for f in user_dir.iterdir() 
-        if f.is_file() and f.suffix.lower() in ALLOWED_EXTENSIONS
-    ])
-    
-    
-def _delete_file(user_id: int, filename: str) -> bool:
-    """Удаляет файл. Возвращает True при успехе."""
-    file_path = _get_user_dir(user_id) / filename
-    if file_path.exists():
-        file_path.unlink()
-        return True
-    return False
-
 def get_manage_keyboard() -> InlineKeyboardBuilder:
     """Собирает inline-клавиатуру управления базой."""
     kb = InlineKeyboardBuilder()
@@ -55,9 +46,10 @@ def get_manage_keyboard() -> InlineKeyboardBuilder:
     kb.row(InlineKeyboardButton(text="❌ Закрыть", callback_data="close_callback"))
     return kb
 
-def get_manage_text(user_id: int) -> str:
-    """Формирует текст статуса базы знаний."""
-    files_count = len(_list_files(user_id))
+async def get_manage_text(user_id: int) -> str:
+    """Формирует текст статуса базы знаний (переведено на ORM)."""
+    user_files = await get_user_files(user_id)
+    files_count = len(user_files)
     return (
         f"📂 <b>Управление базой знаний</b>\n\n"
         f"📄 Загружено файлов: <b>{files_count}</b>\n\n"
@@ -65,22 +57,26 @@ def get_manage_text(user_id: int) -> str:
     )
 
 
-# ======Тригер====
+# ====== Триггер ====
 @router.message(F.text == "📂 Управление базой")
 async def handle_manage(message: Message):
+    text = await get_manage_text(message.from_user.id)
     await message.answer(
-        text=get_manage_text(message.from_user.id),
+        text=text,
         reply_markup=get_manage_keyboard().as_markup(),
         parse_mode="HTML"
     )
-    await message.delete()
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
 
 
 # ===================== CALLBACK HANDLERS =====================
 @router.callback_query(F.data == "kb_upload")
 async def cb_upload(call: CallbackQuery):
     await call.answer()
-    user_id = call.message.from_user.id
+    user_id = call.from_user.id
     max_size_mb = await get_user_max_file_size(user_id)
     await call.message.edit_text(
         "📤 <b>Загрузка файла</b>\n\n"
@@ -155,7 +151,6 @@ async def cb_delete_exec(call: CallbackQuery):
     
     if deleted_file_data:
         # 2. Удаляем файл физически с диска, используя сохраненный в БД путь
-        # Выполняем в потоке, так как удаление с диска — это блокирующая I/O операция
         file_deleted = await asyncio.to_thread(_physical_delete, deleted_file_data.file_path)
         
         kb = InlineKeyboardBuilder()
@@ -168,7 +163,6 @@ async def cb_delete_exec(call: CallbackQuery):
                 parse_mode="HTML"
             )
         else:
-            # На случай, если в БД запись была, а на диске файл стерли вручную
             await call.message.edit_text(
                 f"⚠️ Запись о файле <code>{deleted_file_data.filename}</code> удалена из БД, но сам файл не был найден на диске.", 
                 reply_markup=kb.as_markup(),
@@ -189,8 +183,6 @@ async def cb_view_menu(call: CallbackQuery):
     files = await get_user_files(user_id)
     
     if not files:
-        # Для UX лучше изменить текст старого сообщения, а не слать новое поверх,
-        # чтобы кнопки "Назад" не пропадали
         kb = InlineKeyboardBuilder()
         kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
         await call.message.edit_text(
@@ -201,7 +193,6 @@ async def cb_view_menu(call: CallbackQuery):
 
     kb = InlineKeyboardBuilder()
     for f in files:
-        # ✅ Безопасно передаем f.id (например: view_info:12) вместо длинного имени файла
         kb.row(InlineKeyboardButton(text=f"👁 {f.filename}", callback_data=f"view_info:{f.id}"))
         
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
@@ -211,15 +202,12 @@ async def cb_view_menu(call: CallbackQuery):
 @router.callback_query(F.data.startswith("view_info:"))
 async def cb_view_info(call: CallbackQuery):
     await call.answer()
-    
-    # Получаем ID файла из callback_data
     file_id = int(call.data.split(":", 1)[1])
     
     # 🔎 Ищем данные о файле в БД по ID
     file_data = await get_file_by_id(file_id)
     
     if file_data:
-        # Красиво форматируем дату создания (из datetime в строку)
         created_str = file_data.created_at.strftime("%d.%m.%Y %H:%M")
         
         kb = InlineKeyboardBuilder()
@@ -241,12 +229,12 @@ async def cb_view_info(call: CallbackQuery):
         )
 
 
-
 @router.callback_query(F.data == "manage_back")
 async def cb_manage_back(call: CallbackQuery):
     await call.answer()
+    text = await get_manage_text(call.from_user.id)
     await call.message.edit_text(
-        text=get_manage_text(call.from_user.id),
+        text=text,
         reply_markup=get_manage_keyboard().as_markup(),
         parse_mode="HTML"
     )
@@ -259,7 +247,6 @@ async def handle_document_upload(message: Message):
     filename = doc.file_name or "unknown"
     user_id = message.from_user.id
     
-    # Заранее подготовим безопасное удаление сообщения пользователя в конце или при ошибке
     async def safe_delete_message():
         try:
             await message.delete()
@@ -293,14 +280,15 @@ async def handle_document_upload(message: Message):
         await safe_delete_message()
         return
 
-    # ✅ 3. Получаем лимит количества файлов из БД напрямую через ORM
+    # ✅ 3. Проверка лимита количества файлов (полностью через ORM)
     max_files = await get_user_max_files(user_id)
-    current_files = await asyncio.to_thread(_list_files, user_id) # Оставляем в потоке, т.к. это работа с диском os.listdir
+    user_files = await get_user_files(user_id)
+    current_files_count = len(user_files)
     
-    if len(current_files) >= max_files:
+    if current_files_count >= max_files:
         await message.answer(
             f"❌ Превышен лимит файлов. Максимально разрешено: <b>{max_files}</b>.\n"
-            f"Сейчас загружено: <b>{len(current_files)}</b>.\n"
+            f"Сейчас загружено: <b>{current_files_count}</b>.\n"
             "Удалите ненужные файлы через раздел «🗑️ Удалить», чтобы загрузить новые.",
             parse_mode="HTML"
         )
@@ -334,7 +322,7 @@ async def handle_document_upload(message: Message):
     )
     
     # 6. Успешный ответ с остатком слотов
-    remaining = max_files - len(current_files) - 1
+    remaining = max_files - current_files_count - 1
     await message.answer(
         f"✅ Файл <code>{filename}</code> успешно сохранён.\n"
         f"📊 Осталось свободных слотов: <b>{remaining}</b> из {max_files}.",
