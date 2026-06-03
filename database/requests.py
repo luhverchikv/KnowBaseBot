@@ -1,10 +1,10 @@
 # database/requests.py
 from database.models import async_session, User, QuizQuestion, Feedback, File
-from sqlalchemy import select, update, delete, func, update, case, desc
+from sqlalchemy import select, update, delete, func, update, case, desc, and_
 import random
 from datetime import datetime, time, timedelta
 from logic.ai_connector import TokenUsage
-from typing import Dict, Any
+from typing import List, Dict, Any
 
 
 # ==== работа с пользователем ===
@@ -320,4 +320,100 @@ async def get_user_analytics_data(user_id: int, days: int = None) -> Dict[str, A
             'wrong': stats_row.wrong if stats_row and stats_row.wrong else 0,
             'top_files': top_files,
             'daily': daily_data
+        }
+
+
+
+# --- 1. Функция для обычных напоминаний ---
+
+async def get_users_for_reminders() -> List[int]:
+    """Возвращает список ID всех пользователей, у которых включены напоминания (reminders=1)."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.user_id).where(User.reminders == 1)
+        )
+        return list(result.scalars().all())
+
+# --- 2. Функции для утренней админ-аналитики ---
+
+async def get_latest_unread_feedback(limit: int = 5) -> List[Dict[str, Any]]:
+    """Возвращает список последних непрочитанных отзывов."""
+    async with async_session() as session:
+        # Предполагается, что в модели Feedback есть поле is_read (0 или 1 / False или True)
+        # Если поле называется по-другому, скорректируйте фильтр
+        stmt = (
+            select(Feedback, User.user_id)
+            .join(User, Feedback.user_id == User.user_id, isouter=True)
+            .where(Feedback.is_read == 0)
+            .order_by(Feedback.created_at.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        
+        unread_list = []
+        for row in result.all():
+            fb = row[0]
+            unread_list.append({
+                'text': fb.feedback_text,
+                'created_at': fb.created_at.strftime('%d.%m %H:%M') if fb.created_at else '',
+                'tg_id': fb.user_id
+            })
+        return unread_list
+
+async def get_daily_summary_data() -> Dict[str, Any]:
+    """
+    Асинхронно собирает общую аналитическую сводку для владельца бота
+    (Всего юзеров, статистика за вчера и статистика за сегодня).
+    """
+    async with async_session() as session:
+        # 1. Всего пользователей
+        total_users = await session.scalar(select(func.count(User.id))) or 0
+
+        # Временные границы для "вчера" и "сегодня"
+        now = datetime.now()
+        today_start = datetime.combine(now.date(), time.min)
+        yesterday_start = today_start - timedelta(days=1)
+
+        # 2. Агрегация за ВЧЕРА
+        yesterday_stmt = select(
+            func.count(QuizQuestion.id).label("cnt"),
+            func.sum(QuizQuestion.gen_total_tokens).label("gen"),
+            func.sum(QuizQuestion.eval_total_tokens).label("eval")
+        ).where(and_(
+            QuizQuestion.generated_at >= yesterday_start,
+            QuizQuestion.generated_at < today_start
+        ))
+        y_res = (await session.execute(yesterday_stmt)).one_or_none()
+
+        # 3. Агрегация за СЕГОДНЯ
+        today_stmt = select(
+            func.count(QuizQuestion.id).label("cnt"),
+            func.sum(QuizQuestion.gen_total_tokens).label("gen"),
+            func.sum(QuizQuestion.eval_total_tokens).label("eval")
+        ).where(QuizQuestion.generated_at >= today_start)
+        t_res = (await session.execute(today_stmt)).one_or_none()
+
+        # Безопасно парсим значения (заменяем None на 0)
+        y_questions = y_res.cnt if y_res else 0
+        y_gen = int(y_res.gen or 0) if y_res else 0
+        y_eval = int(y_res.eval or 0) if y_res else 0
+
+        t_questions = t_res.cnt if t_res else 0
+        t_gen = int(t_res.gen or 0) if t_res else 0
+        t_eval = int(t_res.eval or 0) if t_res else 0
+
+        return {
+            'total_users': total_users,
+            'yesterday': {
+                'questions': y_questions,
+                'gen_tokens': y_gen,
+                'eval_tokens': y_eval,
+                'total_tokens': y_gen + y_eval
+            },
+            'today': {
+                'questions': t_questions,
+                'gen_tokens': t_gen,
+                'eval_tokens': t_eval,
+                'total_tokens': t_gen + t_eval
+            }
         }
