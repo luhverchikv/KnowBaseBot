@@ -2,7 +2,7 @@
 import os
 import asyncio
 from pathlib import Path
-from database import get_user_max_file_size, add_file_to_db, get_user_max_files
+from database import get_user_max_file_size, add_file_to_db, get_user_max_files, get_user_files, get_file_by_id
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -126,32 +126,64 @@ async def cb_delete_exec(call: CallbackQuery):
 @router.callback_query(F.data == "kb_view")
 async def cb_view_menu(call: CallbackQuery):
     await call.answer()
-    files = await asyncio.to_thread(_list_files, call.from_user.id)
+    user_id = call.from_user.id
+    
+    # 🔎 Получаем файлы из базы данных вместо сканирования жесткого диска
+    files = await get_user_files(user_id)
+    
     if not files:
-        await call.message.answer("📂 Ваша база знаний пуста.")
+        # Для UX лучше изменить текст старого сообщения, а не слать новое поверх,
+        # чтобы кнопки "Назад" не пропадали
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
+        await call.message.edit_text(
+            "📂 Ваша база знаний пуста.", 
+            reply_markup=kb.as_markup()
+        )
         return
 
     kb = InlineKeyboardBuilder()
     for f in files:
-        kb.row(InlineKeyboardButton(text=f"👁 {f}", callback_data=f"view_info:{f}"))
+        # ✅ Безопасно передаем f.id (например: view_info:12) вместо длинного имени файла
+        kb.row(InlineKeyboardButton(text=f"👁 {f.filename}", callback_data=f"view_info:{f.id}"))
+        
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
     await call.message.edit_text("📄 Список файлов в вашей базе знаний:", reply_markup=kb.as_markup())
+
 
 @router.callback_query(F.data.startswith("view_info:"))
 async def cb_view_info(call: CallbackQuery):
     await call.answer()
-    filename = call.data.split(":", 1)[1]
-    file_path = _get_user_dir(call.from_user.id) / filename
-    if file_path.exists():
-        size_mb = file_path.stat().st_size / (1024 * 1024)
+    
+    # Получаем ID файла из callback_data
+    file_id = int(call.data.split(":", 1)[1])
+    
+    # 🔎 Ищем данные о файле в БД по ID
+    file_data = await get_file_by_id(file_id)
+    
+    if file_data:
+        # Красиво форматируем дату создания (из datetime в строку)
+        created_str = file_data.created_at.strftime("%d.%m.%Y %H:%M")
+        
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="🔙 К списку файлов", callback_data="kb_view"))
+        
         await call.message.edit_text(
-            f"📄 <b>{filename}</b>\n"
-            f"📦 Размер: {size_mb:.2f} МБ\n"
-            f"🕒 Последнее изменение: {file_path.stat().st_mtime}",
+            f"📄 <b>Имя файла:</b> <code>{file_data.filename}</code>\n"
+            f"📝 <b>Описание:</b> {file_data.description}\n"
+            f"🕒 <b>Дата добавления:</b> {created_str}",
+            reply_markup=kb.as_markup(),
             parse_mode="HTML"
         )
     else:
-        await call.message.edit_text("❌ Файл не найден.")
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="🔙 К списку файлов", callback_data="kb_view"))
+        await call.message.edit_text(
+            "❌ Файл не найден в базе данных.", 
+            reply_markup=kb.as_markup()
+        )
+
+
 
 @router.callback_query(F.data == "manage_back")
 async def cb_manage_back(call: CallbackQuery):
