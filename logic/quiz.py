@@ -216,7 +216,7 @@ async def handle_answer(message: Message, state: FSMContext):
     await state.clear()
 
     # Формируем красивый отчет
-    emoji = {"правильно": "✅", "частично": "🔶", "неправильно": "❌"}._get(correctness, "❓")
+    emoji = {"правильно": "✅", "частично": "🔶", "неправильно": "❌"}.get(correctness, "❓")
     stars = "⭐" * rating + "☆" * (5 - rating)
 
     await message.answer(
