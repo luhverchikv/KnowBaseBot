@@ -1,16 +1,15 @@
 # logic/feedback.py
-import asyncio
-from datetime import datetime
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from logic.manage.db import Database
+
+# Импортируем нашу асинхронную ORM функцию
+from database.requests import save_feedback
 from utils.logger import logger
 
 router = Router()
-db = Database()
 
 # ===================== FSM STATES =====================
 class FeedbackStates(StatesGroup):
@@ -38,7 +37,12 @@ async def feedback_start(message: Message, state: FSMContext):
     )
     
     await message.answer(text, reply_markup=feedback_cancel_keyboard(), parse_mode="HTML")
-    await message.delete()
+    
+    # Безопасное удаление триггер-сообщения пользователя
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
 @router.callback_query(F.data == "feedback_cancel", FeedbackStates.waiting_feedback)
 async def feedback_cancel(call: CallbackQuery, state: FSMContext):
@@ -48,11 +52,14 @@ async def feedback_cancel(call: CallbackQuery, state: FSMContext):
     await call.message.edit_text("✏️ Ввод отзыва отменён. Возвращаемся в меню.")
 
 
-# logic/feedback.py (внутри feedback_received)
-
 @router.message(FeedbackStates.waiting_feedback)
 async def feedback_received(message: Message, state: FSMContext):
     """Получение текста отзыва от пользователя."""
+    # Защита от отправки пустых медиафайлов/стикеров вместо текста
+    if not message.text:
+        await message.answer("⚠️ Пожалуйста, отправьте ваш отзыв в текстовом формате.")
+        return
+
     feedback_text = message.text.strip()
     
     if len(feedback_text) < 5:
@@ -61,10 +68,10 @@ async def feedback_received(message: Message, state: FSMContext):
     
     user_id = message.from_user.id
     
-    # ✅ Сохраняем в БД
-    await asyncio.to_thread(db.save_feedback, user_id, feedback_text)
+    # ✅ Асинхронно сохраняем в БД через ORM SQLAlchemy (без asyncio.to_thread)
+    await save_feedback(user_id, feedback_text)
     
-    # Логируем (опционально)
+    # Логируем
     logger.info(f"Feedback saved from user {user_id}: {feedback_text[:100]}...")
     
     # ✅ Отправляем подтверждение
