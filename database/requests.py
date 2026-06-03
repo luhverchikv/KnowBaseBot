@@ -563,6 +563,8 @@ async def delete_feedback_by_id(fb_id: int) -> bool:
 
 # --- 4. Экспорт ---
 
+# /app/database/requests.py
+
 async def get_user_quiz_export_data_list(user_id: int, days: int = 30) -> List[Dict[str, Any]]:
     """Получает результаты викторин пользователя за последние N дней для экспорта в Excel."""
     async with async_session() as session:
@@ -580,10 +582,10 @@ async def get_user_quiz_export_data_list(user_id: int, days: int = 30) -> List[D
             data_list.append({
                 "generated_at": q.generated_at.strftime("%Y-%m-%d %H:%M:%S") if q.generated_at else "",
                 "source_file": q.source_file,
-                "question_text": q.question,
+                "question_text": q.question,      # 🌟 Ключ для экспорта "question_text" берет значение из q.question
                 "user_answer": q.user_answer,
                 "correctness": q.correctness,
-                "rating": q.rating,
-                "explanation": q.feedback
+                "rating": q.rating or 0,
+                "explanation": q.feedback or ""    # 🌟 Ключ для экспорта "explanation" берет значение из q.feedback
             })
         return data_list
