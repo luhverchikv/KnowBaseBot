@@ -101,3 +101,23 @@ async def get_file_by_id(file_id: int) -> File | None:
         )
         return result.scalar_one_or_none()
 
+
+async def delete_file_from_db(file_id: int) -> File | None:
+    """
+    Удаляет запись о файле из базы данных по его ID.
+    Возвращает объект файла ДО удаления, чтобы можно было получить его путь для стирания с диска.
+    """
+    async with async_session() as session:
+        # 1. Сначала находим запись, чтобы вернуть информацию о ней
+        result = await session.execute(
+            select(File).where(File.id == file_id)
+        )
+        file_data = result.scalar_one_or_none()
+        
+        if file_data:
+            # 2. Удаляем запись из БД
+            await session.delete(file_data)
+            await session.commit()
+            return file_data
+            
+        return None
