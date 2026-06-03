@@ -1,6 +1,9 @@
 # database/requests.py
 from database.models import async_session, User, QuizQuestion, Feedback, File
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func, update
+import random
+from datetime import datetime, time
+from logic.ai_connector import TokenUsage
 
 
 # ==== работа с пользователем ===
@@ -121,3 +124,77 @@ async def delete_file_from_db(file_id: int) -> File | None:
             return file_data
             
         return None
+
+
+# database/requests.py
+
+# --- Функции получения лимитов и настроек пользователя ---
+
+async def get_user_max_questions_per_day(user_id: int) -> int:
+    """Получает лимит количества вопросов в день для пользователя."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.max_questions_per_day).where(User.user_id == user_id)
+        )
+        val = result.scalar_one_or_none()
+        return val if val is not None else 5
+
+async def get_user_difficulty(user_id: int) -> str:
+    """Получает уровень сложности пользователя ('easy', 'medium', 'hard')."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.difficulty).where(User.user_id == user_id)
+        )
+        val = result.scalar_one_or_none()
+        return val if val is not None else "medium"
+
+async def get_daily_questions_count(user_id: int) -> int:
+    """Считает количество сгенерированных вопросов для пользователя за текущие сутки."""
+    async with async_session() as session:
+        # Границы текущих суток
+        start_of_day = datetime.combine(datetime.now().date(), time.min)
+        
+        result = await session.execute(
+            select(func.count(QuizQuestion.id)).where(
+                QuizQuestion.user_id == user_id,
+                QuizQuestion.generated_at >= start_of_day
+            )
+        )
+        return result.scalar_or_none() or 0
+
+# --- Работа с вопросами квиза через ORM ---
+
+async def add_quiz_question(user_id: int, source_file: str, question: str, correct_answer: str, gen_tokens: TokenUsage = None) -> int:
+    """Создает новую запись вопроса в БД и сохраняет токены генерации. Возвращает ID записи."""
+    async with async_session() as session:
+        new_q = QuizQuestion(
+            user_id=user_id,
+            source_file=source_file,
+            question=question,
+            correct_answer=correct_answer,
+            gen_prompt_tokens=gen_tokens.prompt_tokens if gen_tokens else 0,
+            gen_completion_tokens=gen_tokens.completion_tokens if gen_tokens else 0,
+            gen_total_tokens=gen_tokens.total_tokens if gen_tokens else 0
+        )
+        session.add(new_q)
+        await session.commit()
+        return new_q.id
+
+async def update_quiz_result(q_id: int, user_answer: str, correctness: str, feedback: str, rating: int, eval_tokens: TokenUsage = None) -> None:
+    """Обновляет запись вопроса: сохраняет ответ пользователя, оценку, отзыв ИИ и токены оценки."""
+    async with async_session() as session:
+        stmt = (
+            update(QuizQuestion)
+            .where(QuizQuestion.id == q_id)
+            .values(
+                user_answer=user_answer,
+                correctness=correctness,
+                feedback=feedback,
+                rating=rating,
+                eval_prompt_tokens=eval_tokens.prompt_tokens if eval_tokens else 0,
+                eval_completion_tokens=eval_tokens.completion_tokens if eval_tokens else 0,
+                eval_total_tokens=eval_tokens.total_tokens if eval_tokens else 0
+            )
+        )
+        await session.execute(stmt)
+        await session.commit()
