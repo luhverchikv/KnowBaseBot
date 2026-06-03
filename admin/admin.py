@@ -2,7 +2,7 @@
 import asyncio
 import io
 import math
-from datetime import datetime, time, union_type_required_datetime_combine = datetime.combine
+from datetime import datetime, time
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, BufferedInputFile
