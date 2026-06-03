@@ -77,3 +77,27 @@ async def add_file_to_db(user_id: int, filename: str, file_path: str) -> None:
         )
         session.add(new_file)
         await session.commit()
+        
+
+async def get_user_files(user_id: int) -> list[File]:
+    """
+    Возвращает список всех файлов пользователя из базы данных.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(File).where(File.user_id == user_id).order_by(File.filename)
+        )
+        # .scalars().all() превращает результат в обычный список объектов модели File
+        return list(result.scalars().all())
+
+
+async def get_file_by_id(file_id: int) -> File | None:
+    """
+    Возвращает объект файла по его первичному ключу ID.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(File).where(File.id == file_id)
+        )
+        return result.scalar_one_or_none()
+
