@@ -2,7 +2,7 @@
 import asyncio
 import io
 import math
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, BufferedInputFile
