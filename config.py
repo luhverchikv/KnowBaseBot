@@ -1,5 +1,4 @@
 # config.py
-
 from dataclasses import dataclass
 from environs import Env
 
@@ -17,9 +16,14 @@ class AIConfig:
     max_tokens: int = 500
 
 @dataclass
+class DbConfig:
+    url: str
+
+@dataclass
 class Config:
     bot: TgBot
     ai: AIConfig
+    db: DbConfig  # Добавили конфигурацию базы данных
 
 # Инициализация окружения
 env = Env()
@@ -37,6 +41,9 @@ config = Config(
         model=env.str('AI_MODEL', 'gemini-2.5-flash-lite'),
         temperature=env.float('AI_TEMPERATURE', 0.7),
         max_tokens=env.int('AI_MAX_TOKENS', 500)
+    ),
+    db=DbConfig(
+        # Извлекаем DB_URL, если её нет в .env — ставим дефолтный путь к SQLite
+        url=env.str('DB_URL', 'sqlite+aiosqlite:///database/database.db') 
     )
 )
-
