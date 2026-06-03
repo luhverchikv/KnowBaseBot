@@ -2,11 +2,16 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from logic.manage.db import Database
-import asyncio
+
+# Импортируем асинхронные ORM функции вместо старого класса Database
+from database.requests import (
+    get_user_difficulty,
+    set_user_difficulty,
+    get_user_reminders,
+    set_user_reminders
+)
 
 router = Router()
-db = Database()
 
 def settings_keyboard():
     """Клавиатура для меню настроек."""
@@ -24,20 +29,23 @@ def difficulty_keyboard():
         InlineKeyboardButton(text="🤔 Средний", callback_data="diff_medium"),
         InlineKeyboardButton(text="😈 Сложный", callback_data="diff_hard")
     )
-    kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="settings_back"))
+    kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="settings_back_to_menu"))
     return kb.as_markup()
 
 @router.message(F.text == "⚙️ Настройки")
 async def settings_menu(message: Message):
     """Точка входа в настройки с отображением текущих параметров."""
     user_id = message.from_user.id
-    # ✅ Асинхронно получаем текущие значения из БД
-    difficulty = await asyncio.to_thread(db.get_user_difficulty, user_id)
-    reminders = await asyncio.to_thread(db.get_user_reminders, user_id)
-    # ✅ Форматируем для красивого вывода
+    
+    # ✅ Нативно асинхронно получаем текущие значения из БД через ORM
+    difficulty = await get_user_difficulty(user_id)
+    reminders = await get_user_reminders(user_id)
+    
+    # Форматируем для красивого вывода
     diff_map = {"easy": "😊 Легкий", "medium": "🤔 Средний", "hard": "😈 Сложный"}
     diff_text = diff_map.get(difficulty, "🤔 Средний")
     remind_text = "🔔 Включены" if reminders == 1 else "🔕 Выключены"
+    
     text = (
         "⚙️ <b>Настройки бота</b>\n\n"
         f"🧠 Уровень сложности: <b>{diff_text}</b>\n"
@@ -45,7 +53,11 @@ async def settings_menu(message: Message):
         "Выберите параметр, который хотите изменить:"
     )
     await message.answer(text=text, reply_markup=settings_keyboard(), parse_mode="HTML")
-    await message.delete()
+    
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
 @router.callback_query(F.data == "settings_difficulty")
 async def settings_difficulty(call: CallbackQuery):
@@ -53,8 +65,7 @@ async def settings_difficulty(call: CallbackQuery):
     await call.answer()
     user_id = call.from_user.id
     
-    # Получаем текущую сложность
-    difficulty = await asyncio.to_thread(db.get_user_difficulty, user_id)
+    difficulty = await get_user_difficulty(user_id)
     
     diff_names = {
         "easy": "😊 Легкий",
@@ -78,8 +89,8 @@ async def handle_difficulty_selection(call: CallbackQuery):
     user_id = call.from_user.id
     difficulty = call.data.split("_")[1]  # easy, medium, hard
     
-    # Сохраняем в БД
-    await asyncio.to_thread(db.set_user_difficulty, user_id, difficulty)
+    # ✅ Сохраняем в БД асинхронно
+    await set_user_difficulty(user_id, difficulty)
     
     diff_names = {
         "easy": "😊 Легкий",
@@ -88,7 +99,6 @@ async def handle_difficulty_selection(call: CallbackQuery):
     }
     selected_name = diff_names.get(difficulty, difficulty)
     
-    # Показываем подтверждение и возвращаемся в меню настроек
     await call.message.edit_text(
         f"✅ Уровень сложности изменён на: <b>{selected_name}</b>\n\n"
         "Теперь вопросы будут генерироваться с учётом этого уровня.",
@@ -102,10 +112,10 @@ async def settings_reminders(call: CallbackQuery):
     await call.answer()
     user_id = call.from_user.id
     
-    # Получаем текущее значение и инвертируем
-    current = await asyncio.to_thread(db.get_user_reminders, user_id)
+    # ✅ Получаем текущее значение из БД, инвертируем и сохраняем
+    current = await get_user_reminders(user_id)
     new_val = 1 if current == 0 else 0
-    await asyncio.to_thread(db.set_user_reminders, user_id, new_val)
+    await set_user_reminders(user_id, new_val)
     
     status = "✅ Включены (9:00)" if new_val == 1 else "❌ Выключены"
     await call.message.edit_text(
@@ -116,15 +126,23 @@ async def settings_reminders(call: CallbackQuery):
         parse_mode="HTML"
     )
 
-
-
-@router.callback_query(F.data == "settings_back")
-async def settings_back(call: CallbackQuery):
-    """Возврат в главное меню."""
+@router.callback_query(F.data == "settings_back_to_menu")
+async def settings_back_to_menu(call: CallbackQuery):
+    """Возврат назад в главное меню настроек из подменю сложностей."""
     await call.answer()
-    from menu.start_menu import start_keyboard
-    await call.message.edit_text(
-        "🔙 Вы вернулись в главное меню.",
-        reply_markup=start_keyboard()
+    user_id = call.from_user.id
+    
+    difficulty = await get_user_difficulty(user_id)
+    reminders = await get_user_reminders(user_id)
+    
+    diff_map = {"easy": "😊 Легкий", "medium": "🤔 Средний", "hard": "😈 Сложный"}
+    diff_text = diff_map.get(difficulty, "🤔 Средний")
+    remind_text = "🔔 Включены" if reminders == 1 else "🔕 Выключены"
+    
+    text = (
+        "⚙️ <b>Настройки бота</b>\n\n"
+        f"🧠 Уровень сложности: <b>{diff_text}</b>\n"
+        f"🔔 Напоминания: <b>{remind_text}</b>\n\n"
+        "Выберите параметр, который хотите изменить:"
     )
-
+    await call.message.edit_text(text=text, reply_markup=settings_keyboard(), parse_mode="HTML")
