@@ -22,7 +22,9 @@ async_session = async_sessionmaker(
 )
 
 # Базовый класс для моделей
-Base = DeclarativeBase()
+class Base(DeclarativeBase):
+    pass
+
 
 
 # ==========================================
