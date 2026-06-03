@@ -14,6 +14,12 @@ BASE_DIR = Path("database")
 # ✅ Разрешённые расширения (только markdown)
 ALLOWED_EXTENSIONS = {".md", ".markdown"}
 
+def _physical_delete(path_str: str) -> bool:
+    path = Path(path_str)
+    if path.exists():
+        path.unlink()
+        return True
+    return False
 
 def _get_user_dir(user_id: int) -> Path:
     """Возвращает путь к директории пользователя, создаёт её при необходимости."""
@@ -87,42 +93,92 @@ async def cb_upload(call: CallbackQuery):
 @router.callback_query(F.data == "kb_delete")
 async def cb_delete_menu(call: CallbackQuery):
     await call.answer()
-    files = await asyncio.to_thread(_list_files, call.from_user.id)
+    user_id = call.from_user.id
+    
+    # 🔎 Загружаем список файлов из базы данных
+    files = await get_user_files(user_id)
+    
     if not files:
-        await call.message.edit_text("📂 Ваша база знаний пуста. Загрузите файлы через раздел «Загрузить».")
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
+        await call.message.edit_text(
+            "📂 Ваша база знаний пуста. Загрузите файлы через раздел «Загрузить».",
+            reply_markup=kb.as_markup()
+        )
         return
 
     kb = InlineKeyboardBuilder()
     for f in files:
-        kb.row(InlineKeyboardButton(text=f"🗑 {f}", callback_data=f"del_confirm:{f}"))
+        # ✅ Передаем только ID записи в БД вместо имени файла
+        kb.row(InlineKeyboardButton(text=f"🗑 {f.filename}", callback_data=f"del_confirm:{f.id}"))
+        
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
     await call.message.edit_text("Выберите файл для удаления:", reply_markup=kb.as_markup())
+
 
 @router.callback_query(F.data.startswith("del_confirm:"))
 async def cb_delete_confirm(call: CallbackQuery):
     await call.answer()
-    filename = call.data.split(":", 1)[1]
+    file_id = int(call.data.split(":", 1)[1])
+    
+    # Получаем имя файла из БД по его ID для вывода в сообщении
+    file_data = await get_file_by_id(file_id)
+    
+    if not file_data:
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="kb_delete"))
+        await call.message.edit_text("❌ Файл уже удален или не найден.", reply_markup=kb.as_markup())
+        return
+
     kb = InlineKeyboardBuilder()
     kb.row(
-        InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"del_exec:{filename}"),
+        # ✅ В коллбэк удаления тоже передаем компактный ID
+        InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"del_exec:{file_id}"),
         InlineKeyboardButton(text="❌ Отмена", callback_data="kb_delete")
     )
     kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="manage_back"))
+    
     await call.message.edit_text(
-        f"🗑 Вы уверены, что хотите удалить файл <code>{filename}</code>?",
+        f"🗑 Вы уверены, что хотите удалить файл <code>{file_data.filename}</code>?",
         reply_markup=kb.as_markup(),
         parse_mode="HTML"
     )
 
+
 @router.callback_query(F.data.startswith("del_exec:"))
 async def cb_delete_exec(call: CallbackQuery):
     await call.answer()
-    filename = call.data.split(":", 1)[1]
-    success = await asyncio.to_thread(_delete_file, call.from_user.id, filename)
-    if success:
-        await call.message.edit_text(f"✅ Файл <code>{filename}</code> успешно удалён.", parse_mode="HTML")
+    file_id = int(call.data.split(":", 1)[1])
+    
+    # 1. Удаляем запись из базы данных и получаем объект файла
+    deleted_file_data = await delete_file_from_db(file_id)
+    
+    if deleted_file_data:
+        # 2. Удаляем файл физически с диска, используя сохраненный в БД путь
+        # Выполняем в потоке, так как удаление с диска — это блокирующая I/O операция
+        file_deleted = await asyncio.to_thread(_physical_delete, deleted_file_data.file_path)
+        
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="kb_delete"))
+        
+        if file_deleted:
+            await call.message.edit_text(
+                f"✅ Файл <code>{deleted_file_data.filename}</code> успешно удалён из базы данных и с диска.", 
+                reply_markup=kb.as_markup(),
+                parse_mode="HTML"
+            )
+        else:
+            # На случай, если в БД запись была, а на диске файл стерли вручную
+            await call.message.edit_text(
+                f"⚠️ Запись о файле <code>{deleted_file_data.filename}</code> удалена из БД, но сам файл не был найден на диске.", 
+                reply_markup=kb.as_markup(),
+                parse_mode="HTML"
+            )
     else:
-        await call.message.edit_text("❌ Ошибка: файл не найден.")
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text="🔙 Назад", callback_data="kb_delete"))
+        await call.message.edit_text("❌ Ошибка: файл не найден в базе данных.", reply_markup=kb.as_markup())
+
 
 @router.callback_query(F.data == "kb_view")
 async def cb_view_menu(call: CallbackQuery):
