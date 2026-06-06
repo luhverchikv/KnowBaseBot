@@ -143,6 +143,54 @@ class AIConnector:
         return False, None, err_msg, token_usage
 
 
+    async def generate_quiz_pool(self, md_text: str, difficulty: str = 'medium', count: int = 10) -> Tuple[bool, List[Dict], str, Optional[TokenUsage]]:
+        """
+        Генерирует пул из N вопросов по тексту.
+        Возвращает: (success, list_of_dicts, error_message, token_usage)
+        """
+        difficulty_prompts = {
+            'easy': "Вопросы должны быть простыми, прямыми, проверять базовые факты.",
+            'medium': "Вопросы должны быть умеренно сложными, требовать понимания материала.",
+            'hard': "Вопросы должны быть сложными, требовать глубокого анализа и синтеза информации."
+        }
+        diff_instr = difficulty_prompts.get(difficulty, difficulty_prompts['medium'])
+        
+        system = (
+            f"Return STRICTLY a valid JSON array of {count} objects. "
+            f"Each object MUST have exactly two keys: 'question' (string) and 'correct_answer' (string). "
+            f"No extra text, no markdown formatting outside the JSON array.\n"
+            f"Difficulty level: {difficulty.upper()}. {diff_instr}"
+        )
+        
+        # Берем больше текста для пула, чтобы ИИ мог составить 10 разнообразных вопросов
+        safe_text = md_text[:6000] 
+        prompt = f"Generate {count} distinct quiz questions and their exact correct answers based on this text:\n{safe_text}"
+        
+        try:
+            success, data, error, token_usage = await self._call_api(system, prompt)
+            
+            if success and isinstance(data, list) and len(data) > 0:
+                # Валидация структуры каждого элемента
+                valid_pool = []
+                for item in data:
+                    if isinstance(item, dict) and 'question' in item and 'correct_answer' in item:
+                        valid_pool.append({
+                            'question': str(item['question']).strip(),
+                            'correct_answer': str(item['correct_answer']).strip()
+                        })
+                
+                if valid_pool:
+                    return True, valid_pool, "", token_usage
+                else:
+                    return False, [], "ИИ вернул массив, но элементы не содержат ключей 'question' или 'correct_answer'.", token_usage
+            else:
+                return False, [], error or "ИИ не вернул корректный JSON-массив.", token_usage
+                
+        except Exception as e:
+            logger.exception("Unexpected error in generate_quiz_pool")
+            return False, [], f"Неизвестная ошибка: {e}", None
+
+
     async def close(self):
         # В AsyncOpenAI нет явного метода close, сессии закрываются автоматически при сборке мусора,
         # но для совместимости с вашим main.py оставляем заглушку или pass.
