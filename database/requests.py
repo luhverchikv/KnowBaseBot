@@ -636,8 +636,7 @@ async def add_quiz_questions_batch(user_id: int, source_file: str, questions_dat
                     correctness=None,
                     feedback=None,
                     rating=None,
-                    gen_tokens=tokens_per_question,
-                    eval_tokens=0
+                    gen_total_tokens=tokens_per_question,
                 )
                 new_questions.append(new_q)
             
