@@ -1,12 +1,13 @@
 # logic/prompts.py
 
-# ==================== ВИКТОРИНА ====================
+# ==================== СЛОВАРЬ СЛОЖНОСТЕЙ ====================
 QUIZ_DIFFICULTY_PROMPTS = {
     'easy': "Вопрос должен быть простым, прямым и проверять базовое запоминание фактов. Подходит для новичков.",
     'medium': "Вопрос должен быть умеренно сложным, требовать понимания материала и применения знаний на практике.",
     'hard': "Вопрос должен быть сложным, требовать глубокого анализа, синтеза информации или оценки нескольких концепций одновременно."
 }
 
+# ==================== ГЕНЕРАЦИЯ ОДНОГО ВОПРОСА ====================
 QUIZ_GENERATION_SYSTEM_PROMPT = (
     "Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text.\n"
     "Difficulty level: {difficulty}. {diff_instr}"
@@ -14,6 +15,19 @@ QUIZ_GENERATION_SYSTEM_PROMPT = (
 
 QUIZ_GENERATION_USER_PROMPT = (
     "Generate ONE clear quiz question and its exact correct answer based on this text:\n"
+    "{safe_text}"
+)
+
+# ==================== ГЕНЕРАЦИЯ ПУЛА ВОПРОСОВ (НОВОЕ) ====================
+QUIZ_POOL_SYSTEM_PROMPT = (
+    "Return STRICTLY a valid JSON array of {count} objects. "
+    "Each object MUST have exactly two keys: 'question' (string) and 'correct_answer' (string). "
+    "No extra text, no markdown formatting outside the JSON array.\n"
+    "Difficulty level: {difficulty}. {diff_instr}"
+)
+
+QUIZ_POOL_USER_PROMPT = (
+    "Generate {count} distinct quiz questions and their exact correct answers based on this text:\n"
     "{safe_text}"
 )
 
@@ -41,3 +55,4 @@ FILE_DESCRIPTION_USER_PROMPT = (
     "Составь краткое описание для следующего текста:\n\n"
     "{safe_text}"
 )
+
