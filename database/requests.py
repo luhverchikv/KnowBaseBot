@@ -589,3 +589,23 @@ async def get_user_quiz_export_data_list(user_id: int, days: int = 30) -> List[D
                 "eval_tokens": q.eval_total_tokens or 0
             })
         return data_list
+        
+
+async def get_unanswered_quiz_question(user_id: int):
+    """
+    Ищет самый старый неотвеченный вопрос для пользователя.
+    Возвращает объект вопроса или None, если все вопросы отвечены.
+    """
+    async with get_async_session() as session: # Замените get_async_session() на ваш способ получения сессии
+        stmt = (
+            select(QuizQuestion)
+            .where(
+                QuizQuestion.user_id == user_id,
+                # Условие: поле user_answer пустое или NULL
+                (QuizQuestion.user_answer == None) | (QuizQuestion.user_answer == "") 
+            )
+            .order_by(QuizQuestion.created_at.asc()) # Берем самый старый пропущенный вопрос
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
