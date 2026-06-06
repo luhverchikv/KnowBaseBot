@@ -35,6 +35,8 @@ class QuizStates(StatesGroup):
 def quiz_menu_keyboard():
     return InlineKeyboardBuilder().row(
         InlineKeyboardButton(text="🎲 Сгенерировать вопрос", callback_data="quiz_generate")
+    ).row(
+        InlineKeyboardButton(text="📝 Ответить на пропущенный", callback_data="quiz_resume")
     ).as_markup()
 
 @router.message(F.text == "🎓 Викторина")
