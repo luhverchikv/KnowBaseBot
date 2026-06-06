@@ -5,6 +5,7 @@ import random
 from datetime import datetime, time, timedelta
 from logic.ai_connector import TokenUsage
 from typing import List, Dict, Any, Tuple, Optional
+from utils.logger import logger
 
 
 # ==== работа с пользователем ===
@@ -610,34 +611,44 @@ async def get_unanswered_quiz_question(user_id: int):
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
-async def add_quiz_questions_batch(user_id: int, source_file: str, questions_data: List[Dict], total_gen_tokens: int):
+
+async def add_quiz_questions_batch(user_id: int, source_file: str, questions_data: List[Dict], total_gen_tokens: int) -> int:
     """
     Массовое добавление сгенерированных вопросов в БД.
-    questions_data: список словарей [{'question': '...', 'correct_answer': '...'}, ...]
-    total_gen_tokens: общее количество токенов, потраченных на генерацию всего пула.
+    Возвращает количество успешно добавленных вопросов.
     """
-    count = len(questions_data)
-    # Распределяем токены равномерно на каждый вопрос для корректной статистики
-    tokens_per_question = total_gen_tokens // count if count > 0 else 0
-    
-    async with async_session() as session:
-        new_questions = []
-        for q_data in questions_data:
-            new_q = QuizQuestion(
-                user_id=user_id,
-                source_file=source_file,
-                question=q_data['question'],
-                correct_answer=q_data['correct_answer'],
-                user_answer=None,  # Пока пустой
-                correctness=None,
-                feedback=None,
-                rating=None,
-                gen_tokens=tokens_per_question,
-                eval_tokens=0
-            )
-            new_questions.append(new_q)
+    try:
+        count = len(questions_data)
+        if count == 0:
+            return 0
+            
+        tokens_per_question = total_gen_tokens // count
         
-        session.add_all(new_questions)
-        await session.commit()
+        async with async_session() as session:
+            new_questions = []
+            for q_data in questions_data:
+                new_q = QuizQuestion(
+                    user_id=user_id,
+                    source_file=source_file,
+                    question=q_data['question'],
+                    correct_answer=q_data['correct_answer'],
+                    user_answer=None,       # Важно: должно быть None или ""
+                    correctness=None,
+                    feedback=None,
+                    rating=None,
+                    gen_tokens=tokens_per_question,
+                    eval_tokens=0
+                )
+                new_questions.append(new_q)
+            
+            session.add_all(new_questions)
+            await session.commit()
+            
+        logger.info(f"✅ Успешно добавлено {len(new_questions)} вопросов в БД для пользователя {user_id}")
+        return len(new_questions)
         
-    return len(new_questions)
+    except Exception as e:
+        # 🔥 Критически важное логирование: если сохранение упадёт, мы увидим причину в логах
+        logger.exception(f"❌ ОШИБКА при сохранении пула вопросов в БД: {e}")
+        raise  # Пробрасываем ошибку дальше, чтобы обработчик её поймал
+
