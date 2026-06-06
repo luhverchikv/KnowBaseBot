@@ -23,7 +23,8 @@ from database.requests import (
     get_user_files,
     get_user_difficulty,
     add_quiz_question,
-    update_quiz_result
+    update_quiz_result,
+    get_unanswered_quiz_question
 )
 
 router = Router()
@@ -236,4 +237,47 @@ async def cancel_quiz(call: CallbackQuery, state: FSMContext):
     await call.message.answer(
         "🔙 Викторина отменена.",
         reply_markup=quiz_menu_keyboard()
+    )
+
+
+# 3. ДОБАВЛЯЕМ НОВЫЙ ОБРАБОТЧИК ДЛЯ ПРОПУЩЕННЫХ ВОПРОСОВ
+@router.callback_query(F.data == "quiz_resume")
+async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    user_id = call.from_user.id
+    
+    # Ищем неотвеченный вопрос в базе данных
+    unanswered_q = await get_unanswered_quiz_question(user_id)
+    
+    if not unanswered_q:
+        await call.message.answer(
+            "🎉 У вас нет пропущенных вопросов! Отличная работа, так держать.",
+            reply_markup=quiz_menu_keyboard()
+        )
+        return
+
+    # Восстанавливаем состояние FSM, как будто вопрос только что был сгенерирован
+    await state.update_data(
+        question_id=unanswered_q.id,
+        correct_answer=unanswered_q.correct_answer,
+        question_text=unanswered_q.question,
+        source_file=unanswered_q.source_file
+    )
+    await state.set_state(QuizStates.waiting_answer)
+    
+    # Безопасное отображение длинных имен файлов
+    display_filename = unanswered_q.source_file if len(unanswered_q.source_file) <= 30 else unanswered_q.source_file[:27] + "..."
+    
+    kb = InlineKeyboardBuilder().row(
+        InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel")
+    )
+    
+    # Формируем сообщение с вопросом. 
+    # Если в вашей модели есть поле description, можно добавить его вывод, как в handle_generate
+    await call.message.answer(
+        f"📄 <i>Источник: {display_filename}</i>\n\n"
+        f"❓ <b>Вопрос:</b>\n{unanswered_q.question}\n\n"
+        f"Напишите ответ (текстом или голосом):",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
     )
