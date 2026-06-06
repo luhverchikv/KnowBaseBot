@@ -596,7 +596,7 @@ async def get_unanswered_quiz_question(user_id: int):
     Ищет самый старый неотвеченный вопрос для пользователя.
     Возвращает объект вопроса или None, если все вопросы отвечены.
     """
-    async with get_async_session() as session: # Используйте ваш актуальный способ получения сессии
+    async with async_session() as session: # Используйте ваш актуальный способ получения сессии
         stmt = (
             select(QuizQuestion)
             .where(
