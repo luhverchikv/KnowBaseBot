@@ -3,12 +3,17 @@ import json
 import asyncio
 from typing import Dict, Tuple, Optional, List
 from dataclasses import dataclass
-
-# ✅ Используем официальную асинхронную библиотеку
 from openai import AsyncOpenAI, APIError, APIConnectionError, RateLimitError
-
 from config import config
 from utils.logger import logger
+
+from logic.prompts import (
+    QUIZ_DIFFICULTY_PROMPTS,
+    QUIZ_GENERATION_SYSTEM_PROMPT, QUIZ_GENERATION_USER_PROMPT,
+    QUIZ_POOL_SYSTEM_PROMPT, QUIZ_POOL_USER_PROMPT,
+    EVALUATION_SYSTEM_PROMPT, EVALUATION_USER_PROMPT,
+    FILE_DESCRIPTION_SYSTEM_PROMPT, FILE_DESCRIPTION_USER_PROMPT
+)
 
 @dataclass
 class TokenUsage:
@@ -97,80 +102,61 @@ class AIConnector:
             logger.exception("Unexpected error in AIConnector")
             return False, None, f"Неизвестная ошибка: {e}", None
 
-    # logic/ai_connector.py (замените метод generate_quiz_question)
+    
     async def generate_quiz_question(self, md_text: str, difficulty: str = 'medium') -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
-        difficulty_prompts = {
-            'easy': "Вопрос должен быть простым, прямым и проверять базовое запоминание фактов. Подходит для новичков.",
-            'medium': "Вопрос должен быть умеренно сложным, требовать понимания материала и применения знаний на практике.",
-            'hard': "Вопрос должен быть сложным, требовать глубокого анализа, синтеза информации или оценки нескольких концепций одновременно."
-        }
-        diff_instr = difficulty_prompts.get(difficulty, difficulty_prompts['medium'])
+        diff_instr = QUIZ_DIFFICULTY_PROMPTS.get(difficulty, QUIZ_DIFFICULTY_PROMPTS['medium'])
         
-        system = f"Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text.\nDifficulty level: {difficulty.upper()}. {diff_instr}"
+        # Подставляем переменные в шаблон из prompts.py
+        system = QUIZ_GENERATION_SYSTEM_PROMPT.format(
+            difficulty=difficulty.upper(), 
+            diff_instr=diff_instr
+        )
         safe_text = md_text[:3000]
-        prompt = f"Generate ONE clear quiz question and its exact correct answer based on this text:\n{safe_text}"
+        prompt = QUIZ_GENERATION_USER_PROMPT.format(safe_text=safe_text)
+        
         return await self._call_api(system, prompt)
 
 
     async def evaluate_answer(self, question: str, correct: str, user: str) -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
-        system = "Return strictly valid JSON with keys: 'correctness' (one of: 'правильно','частично','неправильно'), 'feedback' (short explanation in Russian), 'rating' (1-5)."
-        prompt = f"Question: {question}\nCorrect: {correct}\nUser: {user}\nEvaluate and return JSON only."
+        system = EVALUATION_SYSTEM_PROMPT
+        prompt = EVALUATION_USER_PROMPT.format(
+            question=question, 
+            correct=correct, 
+            user=user
+        )
         return await self._call_api(system, prompt)
     
     
     async def generate_file_description(self, md_text: str) -> Tuple[bool, Optional[str], str, Optional[TokenUsage]]:
-        """
-        Генерирует краткое описание (summary) для загруженного markdown-файла.
-        Возвращает: (success, description_text, error_message, token_usage)
-        """
-        system = (
-            "Вы — ассистент базы знаний. Проанализируйте текст и составьте его очень краткое описание "
-            "на русском языке (1-2 предложения, максимум 150 символов), отражающее суть документа.\n"
-            "Верните ответ СТРОГО в формате JSON с единственным ключом 'description'. Никакого другого текста."
-        )
-        # Ограничиваем срез текста, чтобы не выйти за лимиты токенов
+        system = FILE_DESCRIPTION_SYSTEM_PROMPT
         safe_text = md_text[:4000]
-        prompt = f"Составь краткое описание для следующего текста:\n\n{safe_text}"
+        prompt = FILE_DESCRIPTION_USER_PROMPT.format(safe_text=safe_text)
         
-        # Вызываем универсальный метод API
         success, data, error, token_usage = await self._call_api(system, prompt)
         
         if success and data and "description" in data:
             return True, data["description"], "", token_usage
         
-        # Если ИИ вернул JSON, но без нужного ключа, или произошла ошибка API
         err_msg = error or "ИИ не вернул ключ 'description' в JSON."
         return False, None, err_msg, token_usage
 
 
     async def generate_quiz_pool(self, md_text: str, difficulty: str = 'medium', count: int = 10) -> Tuple[bool, List[Dict], str, Optional[TokenUsage]]:
-        """
-        Генерирует пул из N вопросов по тексту.
-        Возвращает: (success, list_of_dicts, error_message, token_usage)
-        """
-        difficulty_prompts = {
-            'easy': "Вопросы должны быть простыми, прямыми, проверять базовые факты.",
-            'medium': "Вопросы должны быть умеренно сложными, требовать понимания материала.",
-            'hard': "Вопросы должны быть сложными, требовать глубокого анализа и синтеза информации."
-        }
-        diff_instr = difficulty_prompts.get(difficulty, difficulty_prompts['medium'])
+        diff_instr = QUIZ_DIFFICULTY_PROMPTS.get(difficulty, QUIZ_DIFFICULTY_PROMPTS['medium'])
         
-        system = (
-            f"Return STRICTLY a valid JSON array of {count} objects. "
-            f"Each object MUST have exactly two keys: 'question' (string) and 'correct_answer' (string). "
-            f"No extra text, no markdown formatting outside the JSON array.\n"
-            f"Difficulty level: {difficulty.upper()}. {diff_instr}"
+        system = QUIZ_POOL_SYSTEM_PROMPT.format(
+            count=count,
+            difficulty=difficulty.upper(), 
+            diff_instr=diff_instr
         )
         
-        # Берем больше текста для пула, чтобы ИИ мог составить 10 разнообразных вопросов
         safe_text = md_text[:6000] 
-        prompt = f"Generate {count} distinct quiz questions and their exact correct answers based on this text:\n{safe_text}"
+        prompt = QUIZ_POOL_USER_PROMPT.format(count=count, safe_text=safe_text)
         
         try:
             success, data, error, token_usage = await self._call_api(system, prompt)
             
             if success and isinstance(data, list) and len(data) > 0:
-                # Валидация структуры каждого элемента
                 valid_pool = []
                 for item in data:
                     if isinstance(item, dict) and 'question' in item and 'correct_answer' in item:
@@ -192,10 +178,8 @@ class AIConnector:
 
 
     async def close(self):
-        # В AsyncOpenAI нет явного метода close, сессии закрываются автоматически при сборке мусора,
-        # но для совместимости с вашим main.py оставляем заглушку или pass.
         pass
 
-# Синглтон для удобного импорта
+
 ai_client = AIConnector()
 
