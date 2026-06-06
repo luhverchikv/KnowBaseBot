@@ -1,7 +1,7 @@
 # logic/ai_connector.py
 import json
 import asyncio
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 from dataclasses import dataclass
 
 # ✅ Используем официальную асинхронную библиотеку
