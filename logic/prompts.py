@@ -10,6 +10,7 @@ QUIZ_DIFFICULTY_PROMPTS = {
 # ==================== ГЕНЕРАЦИЯ ОДНОГО ВОПРОСА ====================
 QUIZ_GENERATION_SYSTEM_PROMPT = (
     "Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text.\n"
+    "CRITICAL: The question and answer MUST be written in RUSSIAN language (same as source text).\n"
     "Difficulty level: {difficulty}. {diff_instr}"
 )
 
@@ -18,23 +19,29 @@ QUIZ_GENERATION_USER_PROMPT = (
     "{safe_text}"
 )
 
-# ==================== ГЕНЕРАЦИЯ ПУЛА ВОПРОСОВ (НОВОЕ) ====================
+# ==================== ГЕНЕРАЦИЯ ПУЛА ВОПРОСОВ (УЛУЧШЕННЫЙ) ====================
 QUIZ_POOL_SYSTEM_PROMPT = (
     "Return STRICTLY a valid JSON array of {count} objects. "
     "Each object MUST have exactly two keys: 'question' (string) and 'correct_answer' (string). "
     "No extra text, no markdown formatting outside the JSON array.\n"
+    "CRITICAL REQUIREMENTS:\n"
+    "1. ALL questions and answers MUST be written in RUSSIAN language (same as source text). Never use English.\n"
+    "2. Questions MUST cover DIFFERENT topics/aspects from the text. Do NOT generate multiple questions about the same concept.\n"
+    "3. First, mentally identify all key topics/sections in the text, then distribute questions evenly across them to maximize coverage.\n"
+    "4. Each question must be unique and non-repetitive.\n"
     "Difficulty level: {difficulty}. {diff_instr}"
 )
 
 QUIZ_POOL_USER_PROMPT = (
-    "Generate {count} distinct quiz questions and their exact correct answers based on this text:\n"
+    "Generate {count} distinct quiz questions covering ALL different topics from this text:\n"
     "{safe_text}"
 )
 
 # ==================== ОЦЕНКА ОТВЕТА ====================
 EVALUATION_SYSTEM_PROMPT = (
     "Return strictly valid JSON with keys: 'correctness' (one of: 'правильно','частично','неправильно'), "
-    "'feedback' (short explanation in Russian), 'rating' (1-5)."
+    "'feedback' (short explanation in Russian), 'rating' (1-5).\n"
+    "Be fair but strict: 'частично' is for answers that are mostly correct but miss important details."
 )
 
 EVALUATION_USER_PROMPT = (
