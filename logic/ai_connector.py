@@ -141,7 +141,7 @@ class AIConnector:
         return False, None, err_msg, token_usage
 
 
-    async def generate_quiz_pool(self, md_text: str, difficulty: str = 'medium', count: int = 10) -> Tuple[bool, List[Dict], str, Optional[TokenUsage]]:
+    async def generate_quiz_pool(self, md_text: str, difficulty: str = 'medium', count: int = 15) -> Tuple[bool, List[Dict], str, Optional[TokenUsage]]:
         diff_instr = QUIZ_DIFFICULTY_PROMPTS.get(difficulty, QUIZ_DIFFICULTY_PROMPTS['medium'])
         
         system = QUIZ_POOL_SYSTEM_PROMPT.format(
