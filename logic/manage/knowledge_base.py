@@ -214,7 +214,7 @@ async def cb_view_info(call: CallbackQuery):
         
         kb = InlineKeyboardBuilder()
         kb.row(InlineKeyboardButton(text="🔙 К списку файлов", callback_data="kb_view"))
-        kb.row(InlineKeyboardButton(text="🧠 Сгенерировать пул (10 вопросов)", callback_data=f"gen_pool:{file_id}"))
+        kb.row(InlineKeyboardButton(text="🧠 Сгенерировать пул (15 вопросов)", callback_data=f"gen_pool:{file_id}"))
         
         await call.message.edit_text(
             f"📄 <b>Имя файла:</b> <code>{file_data.filename}</code>\n"
@@ -385,14 +385,14 @@ async def cb_generate_pool(call: CallbackQuery):
 
     if len(md_text.strip()) < 500:
         await call.message.answer(
-            "⚠️ Файл слишком короткий для генерации 10 качественных вопросов. "
+            "⚠️ Файл слишком короткий для генерации 15 качественных вопросов. "
             "Добавьте больше информации в файл или сгенерируйте вопросы по другому файлу."
         )
         return
 
     # 3. Показываем статус загрузки
     status_msg = await call.message.answer(
-        "⏳ <i>Нейросеть анализирует файл и генерирует пул из 10 вопросов... Это может занять 10-20 секунд.</i>", 
+        "⏳ <i>Нейросеть анализирует файл и генерирует пул из 15 вопросов... Это может занять 10-20 секунд.</i>", 
         parse_mode="HTML"
     )
 
