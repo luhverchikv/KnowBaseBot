@@ -400,7 +400,7 @@ async def cb_generate_pool(call: CallbackQuery):
     difficulty = await get_user_difficulty(user_id)
 
     # 5. Запрашиваем пул у ИИ
-    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, difficulty=difficulty, count=10)
+    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, difficulty=difficulty, count=15)
     
     try:
         await status_msg.delete()
