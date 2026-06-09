@@ -1,22 +1,20 @@
 # logic/quiz.py
+
 import os
 import asyncio
 from pathlib import Path
-import aiofiles  # Для асинхронного неблокирующего чтения файлов
-import random
+import aiofiles
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-# Импортируем зависимости проекта
 from voice_engine.converter import ogg_to_wav
 from voice_engine.recognizer import recognize_text_from_wav
 from logic.ai_connector import ai_client
 from utils.logger import logger
 
-# Подключаем асинхронные ORM запросы вместо старого класса Database
 from database.requests import (
     get_user_max_questions_per_day,
     get_daily_questions_count,
@@ -24,7 +22,9 @@ from database.requests import (
     get_user_difficulty,
     add_quiz_question,
     update_quiz_result,
-    get_unanswered_quiz_question
+    get_unanswered_quiz_question,
+    add_quiz_questions_batch,
+    get_file_by_id
 )
 
 router = Router()
@@ -32,9 +32,10 @@ router = Router()
 class QuizStates(StatesGroup):
     waiting_answer = State()
 
+# ✅ ИЗМЕНЁННАЯ КЛАВИАТУРА: "Сгенерировать вопросы" вместо "Сгенерировать вопрос"
 def quiz_menu_keyboard():
     return InlineKeyboardBuilder().row(
-        InlineKeyboardButton(text="🎲 Сгенерировать вопрос", callback_data="quiz_generate")
+        InlineKeyboardButton(text="🎲 Сгенерировать вопросы", callback_data="quiz_generate_pool")
     ).row(
         InlineKeyboardButton(text="📝 Ответить на пропущенный", callback_data="quiz_resume")
     ).as_markup()
@@ -42,14 +43,12 @@ def quiz_menu_keyboard():
 @router.message(F.text == "🎓 Викторина")
 async def quiz_menu(message: Message):
     user_id = message.from_user.id
-    
-    # Получаем лимит через ORM
     max_questions = await get_user_max_questions_per_day(user_id)
     
     await message.answer(
         "🧠 <b>Викторина</b>\n\n"
-        "Нажмите кнопку, чтобы получить вопрос по вашей базе.\n"
-        f"Лимит: <b>{max_questions}</b> в день.",
+        "Нажмите кнопку, чтобы сгенерировать пул вопросов по выбранному файлу.\n"
+        f"Лимит: <b>{max_questions}</b> вопросов в день.",
         reply_markup=quiz_menu_keyboard(),
         parse_mode="HTML"
     )
@@ -58,109 +57,192 @@ async def quiz_menu(message: Message):
     except Exception:
         pass
 
-
-@router.callback_query(F.data == "quiz_generate")
-async def handle_generate(call: CallbackQuery, state: FSMContext):
+# ✅ НОВЫЙ ОБРАБОТЧИК: Показ списка файлов для генерации пула
+@router.callback_query(F.data == "quiz_generate_pool")
+async def handle_generate_pool_menu(call: CallbackQuery):
     await call.answer()
     user_id = call.from_user.id
     
-    # 1. Проверяем суточный лимит вопросов
+    # Проверяем суточный лимит
     max_q = await get_user_max_questions_per_day(user_id)
     current_q_count = await get_daily_questions_count(user_id)
     
     if current_q_count >= max_q:
         await call.message.answer(f"❌ Лимит ({max_q}) на сегодня исчерпан. Возвращайтесь завтра!")
         return
-
-    # 2. Выбираем случайный файл из базы данных пользователя
+    
+    # Получаем список файлов пользователя
     user_files = await get_user_files(user_id)
     if not user_files:
-        await call.message.edit_text("📂 Ваша база знаний пуста. Сначала загрузите .md файлы через управление базой.")
+        await call.message.answer(
+            "📂 Ваша база знаний пуста. Сначала загрузите .md файлы через управление базой."
+        )
         return
     
-    selected_file = random.choice(user_files)
-    filename = selected_file.filename
-    file_path = Path(selected_file.file_path)
+    # Строим клавиатуру со списком файлов
+    kb = InlineKeyboardBuilder()
+    for f in user_files:
+        # Обрезаем длинные имена файлов для красоты
+        display_name = f.filename if len(f.filename) <= 30 else f.filename[:27] + "..."
+        kb.row(InlineKeyboardButton(text=f"📄 {display_name}", callback_data=f"quiz_select_file:{f.id}"))
+    
+    kb.row(InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel_pool"))
+    
+    await call.message.answer(
+        "📚 <b>Выберите файл</b> для генерации пула вопросов:\n\n"
+        "По выбранному файлу будет сгенерировано 10 вопросов за один запрос к ИИ.",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
 
-    # 3. Асинхронно читаем контент markdown-файла
+# ✅ НОВЫЙ ОБРАБОТЧИК: Отмена выбора файла
+@router.callback_query(F.data == "quiz_cancel_pool")
+async def cancel_pool_generation(call: CallbackQuery):
+    await call.answer()
+    await call.message.answer(
+        "❌ Генерация вопросов отменена.",
+        reply_markup=quiz_menu_keyboard()
+    )
+
+# ✅ НОВЫЙ ОБРАБОТЧИК: Выбор файла и генерация пула
+@router.callback_query(F.data.startswith("quiz_select_file:"))
+async def handle_file_selection_and_generate(call: CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    
+    try:
+        file_id = int(call.data.split(":")[1])
+    except (IndexError, ValueError):
+        await call.message.answer("❌ Ошибка: некорректный ID файла.")
+        return
+    
+    # Получаем данные файла
+    file_data = await get_file_by_id(file_id)
+    if not file_data:
+        await call.message.answer("❌ Ошибка: файл не найден.")
+        return
+    
+    file_path = Path(file_data.file_path)
+    
+    # Читаем файл
     try:
         async with aiofiles.open(file_path, mode='r', encoding='utf-8', errors='ignore') as f:
             md_text = await f.read()
     except Exception as e:
-        logger.error(f"Read fail for file {file_path}: {e}")
-        await call.message.edit_text("❌ Ошибка чтения файла базы знаний.")
+        logger.error(f"Read fail for quiz pool generation {file_path}: {e}")
+        await call.message.answer("❌ Ошибка чтения файла.")
         return
-
-    status_msg = await call.message.answer("⏳ <i>Нейросеть изучает материал и генерирует вопрос... Пожалуйста, подождите.</i>", parse_mode="HTML")
     
-    # 4. Запрашиваем у ИИ генерацию вопроса с учетом сложности пользователя
+    if len(md_text.strip()) < 500:
+        await call.message.answer(
+            "⚠️ Файл слишком короткий для генерации качественных вопросов. "
+            "Выберите другой файл или дополните этот."
+        )
+        return
+    
+    # Показываем статус
+    status_msg = await call.message.answer(
+        "⏳ <i>Нейросеть анализирует файл и генерирует пул из 10 вопросов... Это может занять 10-20 секунд.</i>",
+        parse_mode="HTML"
+    )
+    
+    # Получаем сложность пользователя
     difficulty = await get_user_difficulty(user_id)
-    success, qa, err, gen_tokens = await ai_client.generate_quiz_question(md_text, difficulty)
+    
+    # Генерируем пул вопросов
+    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, difficulty=difficulty, count=10)
     
     try:
         await status_msg.delete()
     except Exception:
         pass
-
+    
     if not success:
-        await call.message.answer(f"❌ Ошибка генерации ИИ: {err}")
+        await call.message.answer(f"❌ Ошибка генерации пула ИИ: {err}")
         return
-
-    # 5. Сохраняем сгенерированный вопрос в БД через ORM
-    q_id = await add_quiz_question(
+    
+    # Сохраняем пул в БД
+    total_tokens = token_usage.total_tokens if token_usage else 0
+    saved_count = await add_quiz_questions_batch(
         user_id=user_id,
-        source_file=filename,
-        question=qa.get("question", "?"),
-        correct_answer=qa.get("correct_answer", "?"),
-        gen_tokens=gen_tokens
+        source_file=file_data.filename,
+        questions_data=pool,
+        total_gen_tokens=total_tokens
     )
     
-    # Сохраняем состояние контекста
+    # Успешное уведомление
+    await call.message.answer(
+        f"✅ <b>Пул успешно создан!</b>\n\n"
+        f"📄 Файл: <code>{file_data.filename}</code>\n"
+        f"❓ Сгенерировано вопросов: <b>{saved_count}</b>\n"
+        f"🪙 Потрачено токенов (всего): <b>{total_tokens}</b>\n\n"
+        f"Теперь нажмите <b>«📝 Ответить на пропущенный»</b>, чтобы начать проходить вопросы!",
+        parse_mode="HTML",
+        reply_markup=quiz_menu_keyboard()
+    )
+
+# ✅ ОБРАБОТЧИК ДЛЯ ПРОПУЩЕННЫХ ВОПРОСОВ (остается без изменений)
+@router.callback_query(F.data == "quiz_resume")
+async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    user_id = call.from_user.id
+    
+    unanswered_q = await get_unanswered_quiz_question(user_id)
+    
+    if not unanswered_q:
+        await call.message.answer(
+            "🎉 У вас нет пропущенных вопросов! Отличная работа, так держать.",
+            reply_markup=quiz_menu_keyboard()
+        )
+        return
+    
     await state.update_data(
-        question_id=q_id,
-        correct_answer=qa.get("correct_answer", ""),
-        question_text=qa.get("question", ""),
-        source_file=filename
+        question_id=unanswered_q.id,
+        correct_answer=unanswered_q.correct_answer,
+        question_text=unanswered_q.question,
+        source_file=unanswered_q.source_file
     )
     await state.set_state(QuizStates.waiting_answer)
     
-    # Безопасное отображение длинных имен файлов
-    display_filename = filename if len(filename) <= 30 else filename[:27] + "..."
+    display_filename = unanswered_q.source_file if len(unanswered_q.source_file) <= 30 else unanswered_q.source_file[:27] + "..."
     
-    kb = InlineKeyboardBuilder().row(InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel"))
+    kb = InlineKeyboardBuilder().row(
+        InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel")
+    )
+    
     await call.message.answer(
-        f"📄 <i>Источник: {display_filename}</i>\n"
-        f"💡 <i>Описание темы: {selected_file.description or 'Не указано'}</i>\n\n" # Добавили вывод описания ИИ!
-        f"❓ <b>Вопрос:</b>\n{qa.get('question', '?')}\n\nНапишите ответ (текстом или голосом):",
+        f"📄 <i>Источник: {display_filename}</i>\n\n"
+        f"❓ <b>Вопрос:</b>\n{unanswered_q.question}\n\n"
+        f"Напишите ответ (текстом или голосом):",
         reply_markup=kb.as_markup(),
         parse_mode="HTML"
     )
-    
 
+# ✅ ОБРАБОТЧИК ОТВЕТА (остается без изменений)
 @router.message(QuizStates.waiting_answer, F.text | F.voice)
 async def handle_answer(message: Message, state: FSMContext):
     data = await state.get_data()
     q_id = data.get("question_id")
     correct = data.get("correct_answer", "")
     question = data.get("question_text", "")
-
+    
     user_answer = ""
-
-    # 🎙️ Обработка голосового ответа
+    
+    # Обработка голосового ответа
     if message.voice:
         if message.voice.duration > 60:
             await message.answer("⚠️ Голосовое сообщение слишком длинное (максимум 60 сек). Отправьте покороче или напишите текстом.")
             return
-
+        
         status_voice = await message.answer("⏳ Распознаю вашу речь...")
-
+        
         file = await message.bot.get_file(message.voice.file_id)
         ogg_path = f"temp_voice_{message.from_user.id}_{q_id}.ogg"
         wav_path = f"temp_voice_{message.from_user.id}_{q_id}.wav"
-
+        
         await message.bot.download_file(file.file_path, destination=ogg_path)
         await ogg_to_wav(ogg_path, wav_path)
-
+        
         try:
             user_answer = recognize_text_from_wav(wav_path)
         except Exception as e:
@@ -175,20 +257,19 @@ async def handle_answer(message: Message, state: FSMContext):
             for p in (ogg_path, wav_path):
                 if os.path.exists(p):
                     os.remove(p)
-
+        
         if not user_answer or not user_answer.strip():
             await message.answer("⚠️ Аудиозапись пуста или слова не разобраны. Повторите попытку.")
             return
-
-    # 📝 Обработка текстового ответа
+    
     elif message.text:
         user_answer = message.text.strip()
         if not user_answer:
-            return 
+            return
     else:
         return
-
-    # 🤖 Оценка ответа через ИИ
+    
+    # Оценка ответа через ИИ
     status_eval = await message.answer("⏳ Нейросеть оценивает ваш ответ...")
     success, res, err, eval_tokens = await ai_client.evaluate_answer(question, correct, user_answer)
     
@@ -196,17 +277,16 @@ async def handle_answer(message: Message, state: FSMContext):
         await status_eval.delete()
     except Exception:
         pass
-
+    
     if not success:
         await message.answer(f"❌ Оценка не удалась: {err}")
         await state.clear()
         return
-
+    
     correctness = res.get("correctness", "неправильно")
     feedback = res.get("feedback", "Оценка завершена.")
     rating = res.get("rating", 3)
-
-    # ✅ Обновляем результаты викторины в БД одной чистой атомарной ORM транзицией
+    
     await update_quiz_result(
         q_id=q_id,
         user_answer=user_answer,
@@ -217,11 +297,10 @@ async def handle_answer(message: Message, state: FSMContext):
     )
     
     await state.clear()
-
-    # Формируем красивый отчет
+    
     emoji = {"правильно": "✅", "частично": "🔶", "неправильно": "❌"}.get(correctness, "❓")
     stars = "⭐" * rating + "☆" * (5 - rating)
-
+    
     await message.answer(
         f"{emoji} <b>Результат:</b> {correctness}\n"
         f"{stars} <b>Балл:</b> {rating}/5\n\n"
@@ -239,47 +318,4 @@ async def cancel_quiz(call: CallbackQuery, state: FSMContext):
     await call.message.answer(
         "🔙 Викторина отменена.",
         reply_markup=quiz_menu_keyboard()
-    )
-
-
-# 3. ДОБАВЛЯЕМ НОВЫЙ ОБРАБОТЧИК ДЛЯ ПРОПУЩЕННЫХ ВОПРОСОВ
-@router.callback_query(F.data == "quiz_resume")
-async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    user_id = call.from_user.id
-    
-    # Ищем неотвеченный вопрос в базе данных
-    unanswered_q = await get_unanswered_quiz_question(user_id)
-    
-    if not unanswered_q:
-        await call.message.answer(
-            "🎉 У вас нет пропущенных вопросов! Отличная работа, так держать.",
-            reply_markup=quiz_menu_keyboard()
-        )
-        return
-
-    # Восстанавливаем состояние FSM, как будто вопрос только что был сгенерирован
-    await state.update_data(
-        question_id=unanswered_q.id,
-        correct_answer=unanswered_q.correct_answer,
-        question_text=unanswered_q.question,
-        source_file=unanswered_q.source_file
-    )
-    await state.set_state(QuizStates.waiting_answer)
-    
-    # Безопасное отображение длинных имен файлов
-    display_filename = unanswered_q.source_file if len(unanswered_q.source_file) <= 30 else unanswered_q.source_file[:27] + "..."
-    
-    kb = InlineKeyboardBuilder().row(
-        InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel")
-    )
-    
-    # Формируем сообщение с вопросом. 
-    # Если в вашей модели есть поле description, можно добавить его вывод, как в handle_generate
-    await call.message.answer(
-        f"📄 <i>Источник: {display_filename}</i>\n\n"
-        f"❓ <b>Вопрос:</b>\n{unanswered_q.question}\n\n"
-        f"Напишите ответ (текстом или голосом):",
-        reply_markup=kb.as_markup(),
-        parse_mode="HTML"
     )
