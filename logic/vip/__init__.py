@@ -1,1 +1,5 @@
-logic/vip/__init__.py
+# logic/vip/__init__.py
+from .handlers import router
+
+__all__ = ["router"]
+
