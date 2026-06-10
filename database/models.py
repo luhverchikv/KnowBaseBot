@@ -34,6 +34,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("difficulty IN ('easy', 'medium', 'hard')", name="chk_user_difficulty"),
+        CheckConstraint("subscription_status IN ('free', 'premium')", name="chk_subscription_status"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -43,6 +44,8 @@ class User(Base):
     max_questions_per_day: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("5"))
     reminders: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))  # 0/1
     difficulty: Mapped[str] = mapped_column(String(10), nullable=False, server_default=text("'medium'"))
+    subscription_status: Mapped[str] = mapped_column(String(10), nullable=False, server_default=text("'free'"))
+    subscription_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, tg_id={self.user_id}, diff={self.difficulty})>"
@@ -105,6 +108,21 @@ class File(Base):
     # Переведено на серверное время func.now() для стабильной работы СУБД
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
+
+# ✅ НОВАЯ ТАБЛИЦА ДЛЯ СЧЁТЧИКА ГЕНЕРАЦИЙ
+class GenerationCounter(Base):
+    __tablename__ = "generation_counters"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    pool_generations: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    
+    __table_args__ = (
+        # Уникальный индекс на пару user_id + date
+        {'sqlite_autoincrement': True},
+    )
+    
 
 async def init_db():
     """Создаёт таблицы, если их нет"""
