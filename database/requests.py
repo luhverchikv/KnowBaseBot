@@ -1,5 +1,5 @@
 # database/requests.py
-from database.models import async_session, User, QuizQuestion, Feedback, File
+from database.models import async_session, User, QuizQuestion, Feedback, File, GenerationCounter
 from sqlalchemy import select, update, delete, func, update, case, desc, and_
 import random
 from datetime import datetime, time, timedelta
@@ -650,4 +650,97 @@ async def add_quiz_questions_batch(user_id: int, source_file: str, questions_dat
         # 🔥 Критически важное логирование: если сохранение упадёт, мы увидим причину в логах
         logger.exception(f"❌ ОШИБКА при сохранении пула вопросов в БД: {e}")
         raise  # Пробрасываем ошибку дальше, чтобы обработчик её поймал
+
+
+
+# ==================== VIP ФУНКЦИИ ====================
+
+async def get_user_subscription_status(user_id: int) -> dict:
+    """Получает статус подписки пользователя"""
+    async with async_session() as session:
+        stmt = select(User).where(User.user_id == user_id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return {"status": "free", "until": None}
+        
+        # Проверяем, не истекла ли подписка
+        if user.subscription_status == "premium" and user.subscription_until:
+            if datetime.now() > user.subscription_until:
+                # Подписка истекла, обновляем статус
+                user.subscription_status = "free"
+                user.subscription_until = None
+                await session.commit()
+                return {"status": "free", "until": None}
+        
+        return {
+            "status": user.subscription_status,
+            "until": user.subscription_until
+        }
+
+async def upgrade_to_premium(user_id: int, days: int = 30):
+    """Активирует премиум-подписку на указанное количество дней"""
+    async with async_session() as session:
+        stmt = select(User).where(User.user_id == user_id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if user:
+            user.subscription_status = "premium"
+            user.subscription_until = datetime.now() + timedelta(days=days)
+            await session.commit()
+
+async def get_daily_pool_generations(user_id: int) -> int:
+    """Получает количество генераций пулов за сегодня"""
+    today = datetime.now().date()
+    
+    async with async_session() as session:
+        stmt = select(GenerationCounter).where(
+            and_(
+                GenerationCounter.user_id == user_id,
+                func.date(GenerationCounter.date) == today
+            )
+        )
+        result = await session.execute(stmt)
+        counter = result.scalar_one_or_none()
+        
+        return counter.pool_generations if counter else 0
+
+async def increment_pool_generation(user_id: int):
+    """Увеличивает счётчик генераций пулов на 1"""
+    today = datetime.now().date()
+    
+    async with async_session() as session:
+        # Ищем существующую запись за сегодня
+        stmt = select(GenerationCounter).where(
+            and_(
+                GenerationCounter.user_id == user_id,
+                func.date(GenerationCounter.date) == today
+            )
+        )
+        result = await session.execute(stmt)
+        counter = result.scalar_one_or_none()
+        
+        if counter:
+            counter.pool_generations += 1
+        else:
+            # Создаём новую запись
+            new_counter = GenerationCounter(
+                user_id=user_id,
+                date=datetime.now(),
+                pool_generations=1
+            )
+            session.add(new_counter)
+        
+        await session.commit()
+
+async def get_generation_limit(user_id: int) -> int:
+    """Возвращает лимит генераций для пользователя"""
+    sub_status = await get_user_subscription_status(user_id)
+    
+    if sub_status["status"] == "premium":
+        return 10  # VIP: 10 генераций в сутки
+    else:
+        return 2   # Free: 2 генерации в сутки
 
