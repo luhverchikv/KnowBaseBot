@@ -15,7 +15,11 @@ from database.requests import (
     get_file_by_id, 
     delete_file_from_db,
     get_user_difficulty,          
-    add_quiz_questions_batch
+    add_quiz_questions_batch,
+    get_user_subscription_status,
+    get_daily_pool_generations,
+    get_generation_limit,
+    increment_pool_generation
 )
 from logic.ai_connector import ai_client 
 
@@ -366,6 +370,31 @@ async def cb_generate_pool(call: CallbackQuery):
     file_id = int(call.data.split(":", 1)[1])
     user_id = call.from_user.id
     
+    # ✅ ПРОВЕРКА ЛИМИТА ГЕНЕРАЦИЙ
+    current_gens = await get_daily_pool_generations(user_id)
+    limit = await get_generation_limit(user_id)
+    
+    if current_gens >= limit:
+        sub_status = await get_user_subscription_status(user_id)
+        
+        if sub_status["status"] == "free":
+            await call.message.answer(
+                f"⚠️ <b>Лимит генераций исчерпан!</b>\n\n"
+                f"📊 Сегодня вы использовали <b>{current_gens}/{limit}</b> генераций.\n\n"
+                f"💎 Хотите больше? Перейдите на VIP!\n"
+                f"🚀 <b>10 генераций в сутки</b> всего за 150 Stars/месяц\n\n"
+                f"Используйте команду /vip для подробностей.",
+                parse_mode="HTML"
+            )
+        else:
+            await call.message.answer(
+                f"⚠️ <b>Лимит генераций исчерпан!</b>\n\n"
+                f"📊 Сегодня вы использовали <b>{current_gens}/{limit}</b> генераций.\n"
+                f"Подождите до завтра или обратитесь к администратору.",
+                parse_mode="HTML"
+            )
+        return
+    
     # 1. Получаем данные файла
     file_data = await get_file_by_id(file_id)
     if not file_data:
@@ -433,3 +462,5 @@ async def cb_generate_pool(call: CallbackQuery):
             InlineKeyboardButton(text="🎓 Перейти к викторине", callback_data="quiz_resume") # Или просто текстовая кнопка, если роутер не ловит callback из другого меню
         ).as_markup()
     )
+    await increment_pool_generation(user_id)
+    
