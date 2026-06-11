@@ -13,15 +13,14 @@ from admin.admin import router as admin_router
 from logic.feedback import router as feedback_router
 from menu.settings import router as settings_router
 from utils.scheduler import setup_reminder_scheduler
-#from voice_engine.handler import router as voice_router
-from database.models import init_db, migrate_database
+from logic.vip import router as vip_router
+from database.models import init_db
 
 
 async def main():
     
     setup_logging()
     logger.info("Starting bot application")
-    await migrate_database()
     await init_db()
     
     bot = Bot(config.bot.token)
@@ -36,7 +35,7 @@ async def main():
     dp.include_router(admin_router) 
     dp.include_router(feedback_router)
     dp.include_router(settings_router)
-   #dp.include_router(voice_router)
+    dp.include_router(vip_router)
     
     try:
         logger.info("Starting bot polling")
