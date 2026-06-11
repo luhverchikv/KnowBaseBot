@@ -6,6 +6,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery, KeyboardButton, InlineKeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from database.requests import set_user, set_user_difficulty 
+from logic.vip.handlers import cmd_vip
 
 
 router = Router()
@@ -20,6 +21,7 @@ def start_keyboard():
         KeyboardButton(text="💬 Обратная связь"),
         KeyboardButton(text="⚙️ Настройки")
     )
+    builder.row(KeyboardButton(text="💎 VIP"))
     return builder.as_markup(resize_keyboard=True)
 
 def difficulty_keyboard():
@@ -101,3 +103,9 @@ async def handle_difficulty_selection(call: CallbackQuery):
 @router.callback_query(F.data == "close_callback")
 async def close_callback_handler(call: CallbackQuery):
     await call.message.delete()
+
+
+@router.message(F.text == "💎 VIP")
+async def vip_menu(message: Message):
+    """Перенаправляем на команду /vip"""
+    await cmd_vip(message)
