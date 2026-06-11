@@ -3,7 +3,8 @@
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, LabeledPrice, PreCheckoutQuery
 from aiogram.filters import Command
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 from database.requests import (
     get_user_subscription_status,
@@ -167,12 +168,3 @@ async def cancel_vip_purchase(call: CallbackQuery):
     """Отмена покупки"""
     await call.answer("Покупка отменена")
     await call.message.delete()
-
-@router.callback_query(F.data == "vip_back_to_menu")
-async def back_to_main_menu(call: CallbackQuery):
-    """Вернуться в главное меню"""
-    await call.answer()
-    # Импортируем здесь, чтобы избежать циклических импортов
-    from menu.start_menu import start_keyboard, start_text
-    await call.message.edit_text(start_text, reply_markup=start_keyboard(), parse_mode="HTML")
-
