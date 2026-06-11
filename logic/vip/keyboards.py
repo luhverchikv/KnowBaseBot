@@ -12,7 +12,7 @@ def vip_menu_keyboard():
         InlineKeyboardButton(text="⭐ Премиум на 90 дней (400 Stars)", callback_data="vip_buy_90")
     )
     kb.row(
-        InlineKeyboardButton(text="🔙 Назад", callback_data="vip_back_to_menu")
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_callback")
     )
     return kb.as_markup()
 
