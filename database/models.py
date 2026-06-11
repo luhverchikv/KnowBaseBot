@@ -1,11 +1,8 @@
 # database/models.py
 from datetime import datetime
-from sqlalchemy import BigInteger, DateTime, String, Text, Integer, Float, ForeignKey, CheckConstraint, text, func
+from sqlalchemy import BigInteger, DateTime, String, Text, Integer, Float, ForeignKey, CheckConstraint, inspect, text, func
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-
-from sqlalchemy import inspect
-
 from config import config
 
 # Асинхронный движок теперь безопасно получает URL из config.py
@@ -25,8 +22,6 @@ async_session = async_sessionmaker(
 # Базовый класс для моделей
 class Base(DeclarativeBase):
     pass
-
-
 
 # ==========================================
 # 👤 Пользователи
@@ -110,7 +105,7 @@ class File(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
 
-# ✅ НОВАЯ ТАБЛИЦА ДЛЯ СЧЁТЧИКА ГЕНЕРАЦИЙ
+# ✅ ТАБЛИЦА ДЛЯ СЧЁТЧИКА ГЕНЕРАЦИЙ
 class GenerationCounter(Base):
     __tablename__ = "generation_counters"
     
@@ -124,49 +119,6 @@ class GenerationCounter(Base):
         {'sqlite_autoincrement': True},
     )
     
-# database/models.py
-
-
-
-# ... (ваш существующий код с engine, Base, моделями) ...
-
-
-async def migrate_database():
-    """
-    Автоматическая миграция БД: добавляет новые колонки и таблицы,
-    не удаляя существующие данные.
-    """
-    async with engine.begin() as conn:
-        # 1. Получаем список существующих таблиц
-        result = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table';"))
-        existing_tables = {row[0] for row in result.fetchall()}
-        
-        # 2. Миграция таблицы users (добавление VIP-полей)
-        if 'users' in existing_tables:
-            # Получаем список колонок таблицы users
-            result = await conn.execute(text("PRAGMA table_info(users);"))
-            existing_columns = {row[1] for row in result.fetchall()}
-            
-            # Проверяем и добавляем недостающие колонки
-            if 'subscription_status' not in existing_columns:
-                await conn.execute(text(
-                    "ALTER TABLE users ADD COLUMN subscription_status VARCHAR(10) NOT NULL DEFAULT 'free';"
-                ))
-                print("✅ Миграция: добавлена колонка subscription_status в users")
-            
-            if 'subscription_until' not in existing_columns:
-                await conn.execute(text(
-                    "ALTER TABLE users ADD COLUMN subscription_until DATETIME;"
-                ))
-                print("✅ Миграция: добавлена колонка subscription_until в users")
-        
-        # 3. Создаём новые таблицы, если их нет (для GenerationCounter и т.д.)
-        await conn.run_sync(Base.metadata.create_all)
-        
-    print("✅ Миграция базы данных завершена")
-
-
-
 
 async def init_db():
     """Создаёт таблицы, если их нет"""
