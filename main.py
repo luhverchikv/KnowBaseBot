@@ -14,13 +14,14 @@ from logic.feedback import router as feedback_router
 from menu.settings import router as settings_router
 from utils.scheduler import setup_reminder_scheduler
 #from voice_engine.handler import router as voice_router
-from database.models import init_db
+from database.models import init_db, migrate_database
 
 
 async def main():
     
     setup_logging()
     logger.info("Starting bot application")
+    await migrate_database()
     await init_db()
     
     bot = Bot(config.bot.token)
