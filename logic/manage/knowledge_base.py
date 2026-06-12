@@ -218,7 +218,7 @@ async def cb_view_info(call: CallbackQuery):
         
         kb = InlineKeyboardBuilder()
         kb.row(InlineKeyboardButton(text="🔙 К списку файлов", callback_data="kb_view"))
-        kb.row(InlineKeyboardButton(text="🧠 Сгенерировать пул (15 вопросов)", callback_data=f"gen_pool:{file_id}"))
+        #kb.row(InlineKeyboardButton(text="🧠 Сгенерировать пул (15 вопросов)", callback_data=f"gen_pool:{file_id}"))
         
         await call.message.edit_text(
             f"📄 <b>Имя файла:</b> <code>{file_data.filename}</code>\n"
@@ -362,105 +362,3 @@ async def handle_document_upload(message: Message):
         parse_mode="HTML"
     )
     await safe_delete_message()
-
-
-@router.callback_query(F.data.startswith("gen_pool:"))
-async def cb_generate_pool(call: CallbackQuery):
-    await call.answer()
-    file_id = int(call.data.split(":", 1)[1])
-    user_id = call.from_user.id
-    
-    # ✅ ПРОВЕРКА ЛИМИТА ГЕНЕРАЦИЙ
-    current_gens = await get_daily_pool_generations(user_id)
-    limit = await get_generation_limit(user_id)
-    
-    if current_gens >= limit:
-        sub_status = await get_user_subscription_status(user_id)
-        
-        if sub_status["status"] == "free":
-            await call.message.answer(
-                f"⚠️ <b>Лимит генераций исчерпан!</b>\n\n"
-                f"📊 Сегодня вы использовали <b>{current_gens}/{limit}</b> генераций.\n\n"
-                f"💎 Хотите больше? Перейдите на VIP!\n"
-                f"🚀 <b>10 генераций в сутки</b> всего за 150 Stars/месяц\n\n"
-                f"Используйте команду /vip для подробностей.",
-                parse_mode="HTML"
-            )
-        else:
-            await call.message.answer(
-                f"⚠️ <b>Лимит генераций исчерпан!</b>\n\n"
-                f"📊 Сегодня вы использовали <b>{current_gens}/{limit}</b> генераций.\n"
-                f"Подождите до завтра или обратитесь к администратору.",
-                parse_mode="HTML"
-            )
-        return
-    
-    # 1. Получаем данные файла
-    file_data = await get_file_by_id(file_id)
-    if not file_data:
-        await call.message.answer("❌ Ошибка: файл не найден.")
-        return
-
-    file_path = Path(file_data.file_path)
-    
-    # 2. Читаем файл
-    try:
-        async with aiofiles.open(file_path, mode='r', encoding='utf-8', errors='ignore') as f:
-            md_text = await f.read()
-    except Exception as e:
-        logger.error(f"Read fail for pool generation {file_path}: {e}")
-        await call.message.answer("❌ Ошибка чтения файла.")
-        return
-
-    if len(md_text.strip()) < 500:
-        await call.message.answer(
-            "⚠️ Файл слишком короткий для генерации 15 качественных вопросов. "
-            "Добавьте больше информации в файл или сгенерируйте вопросы по другому файлу."
-        )
-        return
-
-    # 3. Показываем статус загрузки
-    status_msg = await call.message.answer(
-        "⏳ <i>Нейросеть анализирует файл и генерирует пул из 15 вопросов... Это может занять 10-20 секунд.</i>", 
-        parse_mode="HTML"
-    )
-
-    # 4. Получаем сложность пользователя
-    difficulty = await get_user_difficulty(user_id)
-
-    # 5. Запрашиваем пул у ИИ
-    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, difficulty=difficulty, count=15)
-    
-    try:
-        await status_msg.delete()
-    except Exception:
-        pass
-
-    if not success:
-        await call.message.answer(f"❌ Ошибка генерации пула ИИ: {err}")
-        return
-
-    # 6. Сохраняем пул в БД
-    total_tokens = token_usage.total_tokens if token_usage else 0
-    saved_count = await add_quiz_questions_batch(
-        user_id=user_id,
-        source_file=file_data.filename,
-        questions_data=pool,
-        total_gen_tokens=total_tokens
-    )
-
-    # 7. Успешное уведомление
-    await call.message.answer(
-        f"✅ <b>Пул успешно создан!</b>\n\n"
-        f"📄 Файл: <code>{file_data.filename}</code>\n"
-        f"❓ Сгенерировано вопросов: <b>{saved_count}</b>\n"
-        f"🪙 Потрачено токенов (всего): <b>{total_tokens}</b>\n\n"
-        f"Теперь вы можете перейти в раздел <b>«🎓 Викторина»</b> и нажать <b>«📝 Ответить на пропущенный»</b>, "
-        f"чтобы пройти этот пул без дополнительных затрат токенов на генерацию!",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardBuilder().row(
-            InlineKeyboardButton(text="🎓 Перейти к викторине", callback_data="quiz_resume") # Или просто текстовая кнопка, если роутер не ловит callback из другого меню
-        ).as_markup()
-    )
-    await increment_pool_generation(user_id)
-    
