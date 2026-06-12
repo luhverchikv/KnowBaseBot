@@ -181,7 +181,7 @@ async def handle_file_selection_and_generate(call: CallbackQuery):
 
     # Показываем статус
     status_msg = await call.message.answer(
-        "⏳ <i>Нейросеть анализирует файл и генерирует пул из 10 вопросов... Это может занять 10-20 секунд.</i>",
+        "⏳ <i>Нейросеть анализирует файл и генерирует пул вопросов... Это может занять 10-20 секунд.</i>",
         parse_mode="HTML"
     )
 
@@ -189,7 +189,7 @@ async def handle_file_selection_and_generate(call: CallbackQuery):
     difficulty = await get_user_difficulty(user_id)
 
     # Генерируем пул вопросов
-    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, difficulty=difficulty, count=10)
+    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, difficulty=difficulty, count=15)
 
     try:
         await status_msg.delete()
