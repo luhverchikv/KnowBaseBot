@@ -21,6 +21,7 @@ from database.requests import (
     add_quiz_question,
     update_quiz_result,
     get_unanswered_quiz_question,
+    get_unanswered_questions_count,
     add_quiz_questions_batch,
     get_file_by_id,
     # ✅ VIP: Функции для проверки и учёта генераций пулов
@@ -34,18 +35,29 @@ router = Router()
 class QuizStates(StatesGroup):
     waiting_answer = State()
 
-# ✅ ИЗМЕНЁННАЯ КЛАВИАТУРА: "Сгенерировать вопросы" вместо "Сгенерировать вопрос"
-def quiz_menu_keyboard():
+
+def quiz_menu_keyboard(unanswered_count: int = 0) -> InlineKeyboardMarkup:
+    """
+    Собирает клавиатуру меню викторины с счётчиком пропущенных вопросов.
+    :param unanswered_count: количество неотвеченных вопросов
+    """
+    # Формируем текст кнопки со счётчиком
+    if unanswered_count > 0:
+        resume_text = f"📝 Ответить на пропущенный ({unanswered_count})"
+    else:
+        resume_text = "📝 Ответить на пропущенный"
+    
     return InlineKeyboardBuilder().row(
         InlineKeyboardButton(text="🎲 Сгенерировать вопросы", callback_data="quiz_generate_pool")
     ).row(
-        InlineKeyboardButton(text="📝 Ответить на пропущенный", callback_data="quiz_resume")
+        InlineKeyboardButton(text=resume_text, callback_data="quiz_resume")
     ).as_markup()
+    
 
 @router.message(F.text == "🎓 Викторина")
 async def quiz_menu(message: Message):
     user_id = message.from_user.id
-
+    unanswered_count = await get_unanswered_questions_count(user_id)
     # ✅ VIP: Получаем лимит генераций пулов с учётом статуса подписки
     current_gens = await get_daily_pool_generations(user_id)
     limit = await get_generation_limit(user_id)
@@ -55,7 +67,7 @@ async def quiz_menu(message: Message):
         "Нажмите кнопку, чтобы сгенерировать пул вопросов по выбранному файлу.\n"
         f"🎲 Генераций сегодня: <b>{current_gens}/{limit}</b>\n\n"
         f"💡 Free пользователям — 2 генерации/день, VIP — до 10.",
-        reply_markup=quiz_menu_keyboard(),
+        reply_markup=quiz_menu_keyboard(unanswered_count),
         parse_mode="HTML"
     )
     try:
@@ -262,7 +274,7 @@ async def handle_answer(message: Message, state: FSMContext):
     question = data.get("question_text", "")
     
     user_answer = ""
-    
+    unanswered_count = await get_unanswered_questions_count(message.from_user.id)
     # Обработка голосового ответа
     if message.voice:
         if message.voice.duration > 60:
@@ -342,7 +354,7 @@ async def handle_answer(message: Message, state: FSMContext):
         f"💬 <b>Пояснение ИИ:</b>\n{feedback}\n\n"
         f"📝 <b>Ваш ответ:</b>\n<i>{user_answer}</i>\n\n"
         f"✅ <b>Правильный ответ:</b>\n<i>{correct}</i>",
-        reply_markup=quiz_menu_keyboard(),
+        reply_markup=quiz_menu_keyboard(unanswered_count),
         parse_mode="HTML"
     )
 
