@@ -21,6 +21,7 @@ from database.models import (
 from logic.ai_connector import TokenUsage
 from utils.logger import logger
 
+
 # =============================================================================
 # КОНСТАНТЫ И ТИПЫ
 # =============================================================================
@@ -418,6 +419,22 @@ async def add_quiz_questions_batch(
     return len(new_questions)
 
 
+async def get_unanswered_questions_count(user_id: int) -> int:
+    """
+    Возвращает количество неотвеченных вопросов для пользователя.
+    """
+    async with async_session() as session:
+        stmt = (
+            select(func.count(QuizQuestion.id))
+            .where(
+                QuizQuestion.user_id == user_id,
+                (QuizQuestion.user_answer == None) | (QuizQuestion.user_answer == "")
+            )
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one()
+        
+        
 # =============================================================================
 # РАБОТА С ОТЗЫВАМИ
 # =============================================================================
