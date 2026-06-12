@@ -21,7 +21,7 @@ def start_keyboard():
         KeyboardButton(text="💬 Обратная связь"),
         KeyboardButton(text="⚙️ Настройки")
     )
-    builder.row(KeyboardButton(text="💎 VIP"))
+    #builder.row(KeyboardButton(text="💎 VIP"))
     return builder.as_markup(resize_keyboard=True)
 
 def difficulty_keyboard():
