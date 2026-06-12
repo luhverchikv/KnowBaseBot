@@ -274,7 +274,7 @@ async def handle_answer(message: Message, state: FSMContext):
     question = data.get("question_text", "")
     
     user_answer = ""
-    unanswered_count = await get_unanswered_questions_count(message.from_user.id)
+    
     # Обработка голосового ответа
     if message.voice:
         if message.voice.duration > 60:
@@ -347,7 +347,7 @@ async def handle_answer(message: Message, state: FSMContext):
     
     emoji = {"правильно": "✅", "частично": "🔶", "неправильно": "❌"}.get(correctness, "❓")
     stars = "⭐" * rating + "☆" * (5 - rating)
-    
+    unanswered_count = await get_unanswered_questions_count(message.from_user.id)
     await message.answer(
         f"{emoji} <b>Результат:</b> {correctness}\n"
         f"{stars} <b>Балл:</b> {rating}/5\n\n"
