@@ -208,7 +208,7 @@ async def show_vip_offer(call: CallbackQuery, bot: Bot):
         )
         
         # Создаём invoice
-        prices = [LabeledPrice(label=f"VIP {days} дней", amount=price * 100)]  # Цена в копейках (1 Star = 100 копеек)
+        prices = [LabeledPrice(label=f"VIP {days} дней", amount=price)]
         
         await bot.send_invoice(
             chat_id=call.from_user.id,
