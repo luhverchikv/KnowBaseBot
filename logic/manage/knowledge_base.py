@@ -17,9 +17,9 @@ from database.requests import (
     get_user_difficulty,          
     add_quiz_questions_batch,
     get_user_subscription_status,
-    get_daily_pool_generations,
-    get_generation_limit,
-    increment_pool_generation
+    #get_daily_pool_generations,
+    #get_generation_limit,
+    #increment_pool_generation
 )
 from logic.ai_connector import ai_client 
 
