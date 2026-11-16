@@ -100,6 +100,7 @@ class File(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
     file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    telegram_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Переведено на серверное время func.now() для стабильной работы СУБД
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
