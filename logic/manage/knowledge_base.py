@@ -332,7 +332,7 @@ async def handle_document_upload(message: Message):
         async with aiofiles.open(dest_path, mode='r', encoding='utf-8', errors='ignore') as f:
             file_content = await f.read()
     except Exception as e:
-        logging.error(f"Ошибка чтения файла {dest_path}: {e}")
+        logger.error(f"Ошибка чтения файла {dest_path}: {e}")
 
     # 🔥 5.2 Генерация описания через ИИ
     description = "Краткое описание отсутствует или не удалось сгенерировать."
@@ -384,7 +384,7 @@ async def handle_document_upload(message: Message):
             await session.commit()
             
     except Exception as e:
-        logging.error(f"Не удалось отправить файл с описанием пользователю {user_id}: {e}")
+        logger.error(f"Не удалось отправить файл с описанием пользователю {user_id}: {e}")
         # Даже если отправка не удалась, файл уже на диске и в БД. 
         # При викторине бот попытается отправить его снова.
 
