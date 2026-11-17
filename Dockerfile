@@ -1,5 +1,5 @@
 # Используем легкую версию Python
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # 🛠 Устанавливаем системные зависимости (ffmpeg)
 RUN apt-get update && \
