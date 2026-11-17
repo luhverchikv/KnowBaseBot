@@ -28,6 +28,7 @@ from database.requests import (
     get_daily_pool_generations,
     get_generation_limit,
     increment_pool_generation,
+    update_file_telegram_message_id,
 )
 
 router = Router()
