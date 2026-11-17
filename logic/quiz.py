@@ -234,6 +234,7 @@ async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
     await call.answer()
     user_id = call.from_user.id
     
+    # 1. Получаем неотвеченный вопрос
     unanswered_q = await get_unanswered_quiz_question(user_id)
     
     if not unanswered_q:
@@ -243,6 +244,7 @@ async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
         )
         return
     
+    # Сохраняем данные в FSM
     await state.update_data(
         question_id=unanswered_q.id,
         correct_answer=unanswered_q.correct_answer,
@@ -251,19 +253,109 @@ async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
     )
     await state.set_state(QuizStates.waiting_answer)
     
-    display_filename = unanswered_q.source_file if len(unanswered_q.source_file) <= 30 else unanswered_q.source_file[:27] + "..."
-    
+    # 2. 🔥 НОВАЯ ЛОГИКА: Поиск файла и получение/обновление telegram_message_id
+    reply_to_id = None
+    source_filename = unanswered_q.source_file
+
+    async with async_session() as session:
+        # Ищем запись файла в БД
+        stmt = select(File).where(File.user_id == user_id, File.filename == source_filename)
+        result = await session.execute(stmt)
+        file_record = result.scalar_one_or_none()
+
+        if file_record and file_record.telegram_message_id:
+            # ✅ Вариант А: ID сообщения уже есть в базе, просто используем его
+            reply_to_id = file_record.telegram_message_id
+            
+        elif file_record and os.path.exists(file_record.file_path):
+            # ✅ Вариант Б: Запись есть, но ID нет (или файл был переотправлен). Отправляем файл заново!
+            try:
+                doc_to_send = FSInputFile(file_record.file_path, filename=file_record.filename)
+                caption_text = f"📚 <b>Источник:</b> {file_record.filename}\n📝 {file_record.description or 'Без описания'}"
+                
+                # Отправляем файл и получаем его message_id
+                sent_file_msg = await call.message.answer_document(
+                    document=doc_to_send,
+                    caption=caption_text,
+                    parse_mode="HTML"
+                )
+                reply_to_id = sent_file_msg.message_id
+
+                # 🔥 Перезаписываем (обновляем) ссылку в базе данных
+                await session.execute(
+                    update(File)
+                    .where(File.id == file_record.id)
+                    .values(telegram_message_id=reply_to_id)
+                )
+                await session.commit()
+                logger.info(f"✅ Обновлен telegram_message_id для файла {source_filename} (user {user_id})")
+                
+            except Exception as e:
+                logger.error(f"Не удалось отправить файл {source_filename} при викторине: {e}")
+        else:
+            # Вариант В: Файл удалён из БД или с диска. Просто продолжаем без ссылки.
+            logger.warning(f"Файл {source_filename} не найден в БД или на диске для user {user_id}")
+
+    # 3. Формируем клавиатуру
     kb = InlineKeyboardBuilder().row(
         InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel")
     )
     
-    await call.message.answer(
+    # 4. Отправляем вопрос, используя ReplyParameters (если reply_to_id был найден или создан)
+    display_filename = source_filename if len(source_filename) <= 30 else source_filename[:27] + "..."
+    
+    question_text = (
         f"📄 <i>Источник: {display_filename}</i>\n\n"
         f"❓ <b>Вопрос:</b>\n{unanswered_q.question}\n\n"
-        f"Напишите ответ (текстом или голосом):",
-        reply_markup=kb.as_markup(),
-        parse_mode="HTML"
+        f"Напишите ответ (текстом или голосом):"
     )
+    
+    await call.message.answer(
+        text=question_text,
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML",
+        reply_parameters=ReplyParameters(message_id=reply_to_id) if reply_to_id else None # 🔥 Ключевая строка
+    )
+
+
+
+
+
+#@router.callback_query(F.data == "quiz_resume")
+#async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
+    #await call.answer()
+    #user_id = call.from_user.id
+    
+    #unanswered_q = await get_unanswered_quiz_question(user_id)
+    
+    #if not unanswered_q:
+        #await call.message.answer(
+            #"🎉 У вас нет пропущенных вопросов! Отличная работа, так держать.",
+            #reply_markup=quiz_menu_keyboard()
+        #)
+        #return
+    
+    #await state.update_data(
+        #question_id=unanswered_q.id,
+        #correct_answer=unanswered_q.correct_answer,
+        #question_text=unanswered_q.question,
+        #source_file=unanswered_q.source_file
+    #)
+    #await state.set_state(QuizStates.waiting_answer)
+    
+    #display_filename = unanswered_q.source_file if len(unanswered_q.source_file) <= 30 else unanswered_q.source_file[:27] + "..."
+    
+    #kb = InlineKeyboardBuilder().row(
+        #InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel")
+    #)
+    
+    #await call.message.answer(
+        #f"📄 <i>Источник: {display_filename}</i>\n\n"
+        #f"❓ <b>Вопрос:</b>\n{unanswered_q.question}\n\n"
+        #f"Напишите ответ (текстом или голосом):",
+        #reply_markup=kb.as_markup(),
+        #parse_mode="HTML"
+    #)
 
 # ✅ ОБРАБОТЧИК ОТВЕТА (остается без изменений)
 @router.message(QuizStates.waiting_answer, F.text | F.voice)
