@@ -22,6 +22,9 @@ from database.requests import (
     #increment_pool_generation
 )
 from logic.ai_connector import ai_client 
+from utils.logger import logger
+
+
 
 router = Router()
 BASE_DIR = Path("database")
