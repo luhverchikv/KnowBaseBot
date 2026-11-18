@@ -4,7 +4,7 @@ import asyncio
 import aiofiles
 from pathlib import Path
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message, InlineKeyboardButton
+from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, FSInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest
 from database.requests import (
@@ -17,6 +17,7 @@ from database.requests import (
     get_user_difficulty,          
     add_quiz_questions_batch,
     get_user_subscription_status,
+    update_file_telegram_message_id,
     #get_daily_pool_generations,
     #get_generation_limit,
     #increment_pool_generation
@@ -374,14 +375,12 @@ async def handle_document_upload(message: Message):
             parse_mode="HTML"
         )
         
-        # 🔥 5.5 ОБНОВЛЕНИЕ БД: Записываем telegram_message_id этого сообщения
-        async with async_session() as session:
-            await session.execute(
-                update(File)
-                .where(File.user_id == user_id, File.filename == filename)
-                .values(telegram_message_id=sent_message.message_id)
-            )
-            await session.commit()
+        # 🔥 5.5 ОБНОВЛЕНИЕ БД: Вызываем вынесенную ORM-функцию
+        await update_file_telegram_message_id(
+            user_id=user_id,
+            filename=filename,
+            telegram_message_id=sent_message.message_id
+        )
             
     except Exception as e:
         logger.error(f"Не удалось отправить файл с описанием пользователю {user_id}: {e}")
