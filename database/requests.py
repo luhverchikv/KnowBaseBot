@@ -273,6 +273,18 @@ async def get_file_by_id(file_id: int) -> Optional[File]:
         return result.scalar_one_or_none()
 
 
+async def get_file_by_user_and_name(user_id: int, filename: str) -> Optional[File]:
+    """
+    Возвращает объект файла по user_id и имени файла.
+    Используется, например, при викторине для поиска исходного документа.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(File).where(File.user_id == user_id, File.filename == filename)
+        )
+        return result.scalar_one_or_none()
+
+
 async def delete_file_from_db(file_id: int) -> Optional[File]:
     """
     Удаляет запись о файле из БД.
