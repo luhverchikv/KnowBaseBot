@@ -677,60 +677,56 @@ async def get_users_for_reminders() -> List[int]:
 
 
 async def get_daily_summary_data() -> Dict[str, Any]:
-    """
-    Возвращает агрегированную аналитическую сводку для админа.
-
-    Returns:
-        dict с данными о пользователях и статистике за вчера/сегодня
-    """
+    """Возвращает агрегированную аналитическую сводку для админа."""
     async with async_session() as session:
         total_users = await session.scalar(select(func.count(User.id))) or 0
-
         now = datetime.now()
         today_start = datetime.combine(now.date(), time.min)
         yesterday_start = today_start - timedelta(days=1)
 
-        # Статистика за вчера
-        yesterday_stmt = select(
-            func.count(QuizQuestion.id).label("cnt"),
-            func.sum(QuizQuestion.gen_total_tokens).label("gen"),
-            func.sum(QuizQuestion.eval_total_tokens).label("eval"),
-        ).where(
-            and_(
-                QuizQuestion.generated_at >= yesterday_start,
-                QuizQuestion.generated_at < today_start,
-            )
-        )
-        y_res = (await session.execute(yesterday_stmt)).one_or_none()
-
-        # Статистика за сегодня
-        today_stmt = select(
-            func.count(QuizQuestion.id).label("cnt"),
-            func.sum(QuizQuestion.gen_total_tokens).label("gen"),
-            func.sum(QuizQuestion.eval_total_tokens).label("eval"),
-        ).where(QuizQuestion.generated_at >= today_start)
-        t_res = (await session.execute(today_stmt)).one_or_none()
-
         def safe_int(value: Any) -> int:
             return int(value or 0)
+
+        # 1. Генерация за вчера (вопросы и токены генерации)
+        y_gen_res = (await session.execute(
+            select(func.count(QuizQuestion.id).label("cnt"), func.sum(QuizQuestion.gen_total_tokens).label("gen"))
+            .where(and_(QuizQuestion.generated_at >= yesterday_start, QuizQuestion.generated_at < today_start))
+        )).one_or_none()
+
+        # 2. Оценка за вчера (только токены оценки)
+        y_eval_res = (await session.execute(
+            select(func.sum(QuizQuestion.eval_total_tokens).label("eval"))
+            .where(and_(QuizQuestion.evaluated_at >= yesterday_start, QuizQuestion.evaluated_at < today_start))
+        )).one_or_none()
+
+        # 3. Генерация за сегодня
+        t_gen_res = (await session.execute(
+            select(func.count(QuizQuestion.id).label("cnt"), func.sum(QuizQuestion.gen_total_tokens).label("gen"))
+            .where(QuizQuestion.generated_at >= today_start)
+        )).one_or_none()
+
+        # 4. Оценка за сегодня
+        t_eval_res = (await session.execute(
+            select(func.sum(QuizQuestion.eval_total_tokens).label("eval"))
+            .where(QuizQuestion.evaluated_at >= today_start)
+        )).one_or_none()
 
         return {
             "total_users": total_users,
             "yesterday": {
-                "questions": y_res.cnt if y_res else 0,
-                "gen_tokens": safe_int(y_res.gen if y_res else None),
-                "eval_tokens": safe_int(y_res.eval if y_res else None),
-                "total_tokens": safe_int(y_res.gen if y_res else None)
-                + safe_int(y_res.eval if y_res else None),
+                "questions": safe_int(y_gen_res.cnt if y_gen_res else 0),
+                "gen_tokens": safe_int(y_gen_res.gen if y_gen_res else 0),
+                "eval_tokens": safe_int(y_eval_res.eval if y_eval_res else 0),
+                "total_tokens": safe_int(y_gen_res.gen if y_gen_res else 0) + safe_int(y_eval_res.eval if y_eval_res else 0),
             },
             "today": {
-                "questions": t_res.cnt if t_res else 0,
-                "gen_tokens": safe_int(t_res.gen if t_res else None),
-                "eval_tokens": safe_int(t_res.eval if t_res else None),
-                "total_tokens": safe_int(t_res.gen if t_res else None)
-                + safe_int(t_res.eval if t_res else None),
+                "questions": safe_int(t_gen_res.cnt if t_gen_res else 0),
+                "gen_tokens": safe_int(t_gen_res.gen if t_gen_res else 0),
+                "eval_tokens": safe_int(t_eval_res.eval if t_eval_res else 0),
+                "total_tokens": safe_int(t_gen_res.gen if t_gen_res else 0) + safe_int(t_eval_res.eval if t_eval_res else 0),
             },
         }
+
 
 
 async def get_user_analytics_data(user_id: int, days: Optional[int] = None) -> Dict[str, Any]:
