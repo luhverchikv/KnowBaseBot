@@ -29,6 +29,7 @@ from database.requests import (
     get_generation_limit,
     increment_pool_generation,
     update_file_telegram_message_id,
+    get_file_by_user_and_name,
 )
 
 router = Router()
@@ -254,22 +255,19 @@ async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
     )
     await state.set_state(QuizStates.waiting_answer)
     
-    # 2. 🔥 НОВАЯ ЛОГИКА: Поиск файла и получение/обновление telegram_message_id
-    reply_to_id = None
-    source_filename = unanswered_q.source_file
-
-    async with async_session() as session:
-        # Ищем запись файла в БД
-        stmt = select(File).where(File.user_id == user_id, File.filename == source_filename)
-        result = await session.execute(stmt)
-        file_record = result.scalar_one_or_none()
-
+        # 2. 🔥 НОВАЯ ЛОГИКА: Поиск файла и получение/обновление telegram_message_id
+        reply_to_id = None
+        source_filename = unanswered_q.source_file
+    
+        # Получаем запись файла через чистую ORM-функцию
+        file_record = await get_file_by_user_and_name(user_id, source_filename)
+    
         if file_record and file_record.telegram_message_id:
             # ✅ Вариант А: ID сообщения уже есть в базе, просто используем его
             reply_to_id = file_record.telegram_message_id
-            
+    
         elif file_record and os.path.exists(file_record.file_path):
-            # ✅ Вариант Б: Запись есть, но ID нет (или файл был переотправлен). Отправляем файл заново!
+            # ✅ Вариант Б: Запись есть, но ID нет. Отправляем файл заново!
             try:
                 doc_to_send = FSInputFile(file_record.file_path, filename=file_record.filename)
                 caption_text = f"📚 <b>Источник:</b> {file_record.filename}\n📝 {file_record.description or 'Без описания'}"
@@ -281,14 +279,13 @@ async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
                     parse_mode="HTML"
                 )
                 reply_to_id = sent_file_msg.message_id
-
-                # 🔥 Перезаписываем (обновляем) ссылку в базе данных
-                await session.execute(
-                    update(File)
-                    .where(File.id == file_record.id)
-                    .values(telegram_message_id=reply_to_id)
+                
+                # 🔥 Обновляем ссылку в базе данных через вынесенную функцию
+                await update_file_telegram_message_id(
+                    user_id=user_id,
+                    filename=source_filename,
+                    telegram_message_id=reply_to_id
                 )
-                await session.commit()
                 logger.info(f"✅ Обновлен telegram_message_id для файла {source_filename} (user {user_id})")
                 
             except Exception as e:
@@ -296,7 +293,8 @@ async def handle_resume_quiz(call: CallbackQuery, state: FSMContext):
         else:
             # Вариант В: Файл удалён из БД или с диска. Просто продолжаем без ссылки.
             logger.warning(f"Файл {source_filename} не найден в БД или на диске для user {user_id}")
-
+    
+    
     # 3. Формируем клавиатуру
     kb = InlineKeyboardBuilder().row(
         InlineKeyboardButton(text="🔙 Отмена", callback_data="quiz_cancel")
