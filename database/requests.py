@@ -839,12 +839,17 @@ async def add_file_to_db(
         await session.refresh(new_file)  # Гарантируем, что ID получен из БД
         return new_file.id
 
-async def update_file_telegram_message_id(file_id: int, telegram_message_id: int) -> None:
-    """Обновляет telegram_message_id для файла по его ID."""
+# database/requests.py (в самом низу файла)
+
+async def update_file_telegram_message_id(user_id: int, filename: str, telegram_message_id: int) -> None:
+    """
+    Обновляет telegram_message_id для файла пользователя.
+    Использует связку user_id + filename для точного поиска без лишних запросов.
+    """
     async with async_session() as session:
         await session.execute(
             update(File)
-            .where(File.id == file_id)
+            .where(File.user_id == user_id, File.filename == filename)
             .values(telegram_message_id=telegram_message_id)
         )
         await session.commit()
