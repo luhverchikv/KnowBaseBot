@@ -59,6 +59,7 @@ class QuizQuestion(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     source_file: Mapped[str] = mapped_column(Text, nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     correct_answer: Mapped[str] = mapped_column(Text, nullable=False)
