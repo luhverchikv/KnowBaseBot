@@ -241,20 +241,39 @@ async def get_user_profile_counters(user_id: int) -> Tuple[int, int]:
 # УПРАВЛЕНИЕ ФАЙЛАМИ
 # =============================================================================
 
-#async def add_file_to_db(
-    #user_id: int, filename: str, file_path: str, description: str = "Краткое описание"
-#) -> None:
-    """Добавляет информацию о загруженном файле в таблицу files."""
-    #async with async_session() as session:
-        #session.add(
-            #File(
-                #user_id=user_id,
-                #filename=filename,
-                #file_path=str(file_path),
-                #description=description,
-            #)
-        #)
-        #await session.commit()
+
+async def add_file_to_db(
+    user_id: int, filename: str, file_path: str, description: str = "Краткое описание"
+) -> int:
+    """
+    Добавляет информацию о загруженном файле в таблицу files.
+    Возвращает ID созданной записи для последующих обновлений.
+    """
+    async with async_session() as session:
+        new_file = File(
+            user_id=user_id,
+            filename=filename,
+            file_path=str(file_path),
+            description=description,
+        )
+        session.add(new_file)
+        await session.commit()
+        await session.refresh(new_file)  # Гарантируем, что ID получен из БД
+        return new_file.id
+
+
+async def update_file_telegram_message_id(user_id: int, filename: str, telegram_message_id: int) -> None:
+    """
+    Обновляет telegram_message_id для файла пользователя.
+    Использует связку user_id + filename для точного поиска без лишних запросов.
+    """
+    async with async_session() as session:
+        await session.execute(
+            update(File)
+            .where(File.user_id == user_id, File.filename == filename)
+            .values(telegram_message_id=telegram_message_id)
+        )
+        await session.commit()
 
 
 async def get_user_files(user_id: int) -> List[File]:
@@ -368,6 +387,7 @@ async def update_quiz_result(
                 eval_prompt_tokens=eval_tokens.prompt_tokens if eval_tokens else 0,
                 eval_completion_tokens=eval_tokens.completion_tokens if eval_tokens else 0,
                 eval_total_tokens=eval_tokens.total_tokens if eval_tokens else 0,
+                evaluated_at=datetime.now(),
             )
         )
         await session.commit()
@@ -815,41 +835,3 @@ async def get_user_quiz_export_data_list(user_id: int, days: int = 30) -> List[D
             }
             for q in questions
         ]
-        
-        
-# новая функция загрузки файла
-# database/requests.py
-
-async def add_file_to_db(
-    user_id: int, filename: str, file_path: str, description: str = "Краткое описание"
-) -> int:
-    """
-    Добавляет информацию о загруженном файле в таблицу files.
-    Возвращает ID созданной записи для последующих обновлений.
-    """
-    async with async_session() as session:
-        new_file = File(
-            user_id=user_id,
-            filename=filename,
-            file_path=str(file_path),
-            description=description,
-        )
-        session.add(new_file)
-        await session.commit()
-        await session.refresh(new_file)  # Гарантируем, что ID получен из БД
-        return new_file.id
-
-# database/requests.py (в самом низу файла)
-
-async def update_file_telegram_message_id(user_id: int, filename: str, telegram_message_id: int) -> None:
-    """
-    Обновляет telegram_message_id для файла пользователя.
-    Использует связку user_id + filename для точного поиска без лишних запросов.
-    """
-    async with async_session() as session:
-        await session.execute(
-            update(File)
-            .where(File.user_id == user_id, File.filename == filename)
-            .values(telegram_message_id=telegram_message_id)
-        )
-        await session.commit()
