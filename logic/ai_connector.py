@@ -8,7 +8,7 @@ from config import config
 from utils.logger import logger
 
 from logic.prompts import (
-    QUIZ_DIFFICULTY_PROMPTS,
+    #QUIZ_DIFFICULTY_PROMPTS,
     QUIZ_GENERATION_SYSTEM_PROMPT, QUIZ_GENERATION_USER_PROMPT,
     QUIZ_POOL_SYSTEM_PROMPT, QUIZ_POOL_USER_PROMPT,
     EVALUATION_SYSTEM_PROMPT, EVALUATION_USER_PROMPT,
@@ -103,13 +103,13 @@ class AIConnector:
             return False, None, f"Неизвестная ошибка: {e}", None
 
     
-    async def generate_quiz_question(self, md_text: str, difficulty: str = 'medium') -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
-        diff_instr = QUIZ_DIFFICULTY_PROMPTS.get(difficulty, QUIZ_DIFFICULTY_PROMPTS['medium'])
+    async def generate_quiz_question(self, md_text: str) -> Tuple[bool, Dict, str, Optional[TokenUsage]]:
+        #diff_instr = QUIZ_DIFFICULTY_PROMPTS.get(difficulty, QUIZ_DIFFICULTY_PROMPTS['medium'])
         
         # Подставляем переменные в шаблон из prompts.py
         system = QUIZ_GENERATION_SYSTEM_PROMPT.format(
-            difficulty=difficulty.upper(), 
-            diff_instr=diff_instr
+            #difficulty=difficulty.upper(), 
+            #diff_instr=diff_instr
         )
         safe_text = md_text[:3000]
         prompt = QUIZ_GENERATION_USER_PROMPT.format(safe_text=safe_text)
@@ -141,13 +141,13 @@ class AIConnector:
         return False, None, err_msg, token_usage
 
 
-    async def generate_quiz_pool(self, md_text: str, difficulty: str = 'medium', count: int = 15) -> Tuple[bool, List[Dict], str, Optional[TokenUsage]]:
-        diff_instr = QUIZ_DIFFICULTY_PROMPTS.get(difficulty, QUIZ_DIFFICULTY_PROMPTS['medium'])
+    async def generate_quiz_pool(self, md_text: str, count: int = 15) -> Tuple[bool, List[Dict], str, Optional[TokenUsage]]:
+        #diff_instr = QUIZ_DIFFICULTY_PROMPTS.get(difficulty, QUIZ_DIFFICULTY_PROMPTS['medium'])
         
         system = QUIZ_POOL_SYSTEM_PROMPT.format(
             count=count,
-            difficulty=difficulty.upper(), 
-            diff_instr=diff_instr
+            #difficulty=difficulty.upper(), 
+            #diff_instr=diff_instr
         )
         
         safe_text = md_text[:6000] 
