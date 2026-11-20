@@ -17,7 +17,7 @@ from utils.logger import logger
 
 from database.requests import (
     get_user_files,
-    get_user_difficulty,
+    #get_user_difficulty,
     add_quiz_question,
     update_quiz_result,
     get_unanswered_quiz_question,
@@ -188,10 +188,10 @@ async def handle_file_selection_and_generate(call: CallbackQuery):
     )
 
     # Получаем сложность пользователя
-    difficulty = await get_user_difficulty(user_id)
+    #difficulty = await get_user_difficulty(user_id)
 
     # Генерируем пул вопросов
-    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, difficulty=difficulty, count=15)
+    success, pool, err, token_usage = await ai_client.generate_quiz_pool(md_text, count=15)
 
     try:
         await status_msg.delete()
