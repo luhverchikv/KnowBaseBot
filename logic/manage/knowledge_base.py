@@ -14,7 +14,7 @@ from database.requests import (
     get_user_files, 
     get_file_by_id, 
     delete_file_from_db,
-    get_user_difficulty,          
+    #get_user_difficulty,          
     add_quiz_questions_batch,
     get_user_subscription_status,
     update_file_telegram_message_id,
