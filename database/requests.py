@@ -27,13 +27,13 @@ from utils.logger import logger
 # =============================================================================
 
 # Допустимые значения сложности
-VALID_DIFFICULTIES: tuple[str, ...] = ("easy", "medium", "hard")
+#VALID_DIFFICULTIES: tuple[str, ...] = ("easy", "medium", "hard")
 
 # Дефолтные значения для пользовательских лимитов
 DEFAULT_MAX_FILE_SIZE_MB: float = 0.25
 DEFAULT_MAX_FILES: int = 3
 DEFAULT_MAX_QUESTIONS_PER_DAY: int = 5
-DEFAULT_DIFFICULTY: str = "medium"
+#DEFAULT_DIFFICULTY: str = "medium"
 
 # Лимиты генераций пулов
 FREE_GENERATION_LIMIT: int = 2
@@ -110,12 +110,12 @@ async def set_user(user_id: int) -> bool:
         return False
 
 
-async def get_user_difficulty(user_id: int) -> str:
+#async def get_user_difficulty(user_id: int) -> str:
     """Возвращает уровень сложности пользователя."""
-    return await _get_user_field(user_id, "difficulty", DEFAULT_DIFFICULTY)
+    #return await _get_user_field(user_id, "difficulty", DEFAULT_DIFFICULTY)
 
 
-async def set_user_difficulty(user_id: int, difficulty: str) -> None:
+#async def set_user_difficulty(user_id: int, difficulty: str) -> None:
     """
     Обновляет уровень сложности для пользователя.
 
@@ -124,10 +124,10 @@ async def set_user_difficulty(user_id: int, difficulty: str) -> None:
         difficulty: Уровень сложности ('easy', 'medium', 'hard')
     """
     # Валидация на уровне Python
-    if difficulty not in VALID_DIFFICULTIES:
-        difficulty = DEFAULT_DIFFICULTY
+    #if difficulty not in VALID_DIFFICULTIES:
+        #difficulty = DEFAULT_DIFFICULTY
 
-    await _update_user_field(user_id, "difficulty", difficulty)
+    #await _update_user_field(user_id, "difficulty", difficulty)
 
 
 async def get_user_reminders(user_id: int) -> int:
