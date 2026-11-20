@@ -1,17 +1,17 @@
 # logic/prompts.py
 
 # ==================== СЛОВАРЬ СЛОЖНОСТЕЙ ====================
-QUIZ_DIFFICULTY_PROMPTS = {
-    'easy': "Вопрос должен быть простым, прямым и проверять базовое запоминание фактов. Подходит для новичков.",
-    'medium': "Вопрос должен быть умеренно сложным, требовать понимания материала и применения знаний на практике.",
-    'hard': "Вопрос должен быть сложным, требовать глубокого анализа, синтеза информации или оценки нескольких концепций одновременно."
+#QUIZ_DIFFICULTY_PROMPTS = {
+    #'easy': "Вопрос должен быть простым, прямым и проверять базовое запоминание фактов. Подходит для новичков.",
+    #'medium': "Вопрос должен быть умеренно сложным, требовать понимания материала и применения знаний на практике.",
+    #'hard': "Вопрос должен быть сложным, требовать глубокого анализа, синтеза информации или оценки нескольких концепций одновременно."
 }
 
 # ==================== ГЕНЕРАЦИЯ ОДНОГО ВОПРОСА ====================
 QUIZ_GENERATION_SYSTEM_PROMPT = (
     "Return strictly valid JSON with keys 'question' and 'correct_answer'. No extra text.\n"
     "CRITICAL: The question and answer MUST be written in RUSSIAN language (same as source text).\n"
-    "Difficulty level: {difficulty}. {diff_instr}"
+    #"Difficulty level: {difficulty}. {diff_instr}"
 )
 
 QUIZ_GENERATION_USER_PROMPT = (
@@ -29,7 +29,7 @@ QUIZ_POOL_SYSTEM_PROMPT = (
     "2. Questions MUST cover DIFFERENT topics/aspects from the text. Do NOT generate multiple questions about the same concept.\n"
     "3. First, mentally identify all key topics/sections in the text, then distribute questions evenly across them to maximize coverage.\n"
     "4. Each question must be unique and non-repetitive.\n"
-    "Difficulty level: {difficulty}. {diff_instr}"
+    #"Difficulty level: {difficulty}. {diff_instr}"
 )
 
 QUIZ_POOL_USER_PROMPT = (
