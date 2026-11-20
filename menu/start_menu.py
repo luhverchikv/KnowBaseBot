@@ -16,11 +16,7 @@ def start_keyboard():
     builder = ReplyKeyboardBuilder()
     builder.row(KeyboardButton(text="📂 Управление базой"))
     builder.row(KeyboardButton(text="🎓 Викторина"))
-    builder.row(KeyboardButton(text="📊 Анализ"))
-    builder.row(
-        KeyboardButton(text="💬 Обратная связь"),
-        KeyboardButton(text="⚙️ Настройки")
-    )
+    builder.row(KeyboardButton(text="⚙️ Настройки"))
     #builder.row(KeyboardButton(text="💎 VIP"))
     return builder.as_markup(resize_keyboard=True)
 
@@ -40,8 +36,6 @@ start_text = """
 Я помогу вам эффективно работать с базой знаний, проходить викторины и анализировать результаты.
 📂 <b>Управление базой</b> – загрузка и обработка файлов
 🎓 <b>Викторина</b> – проверка знаний по вашим материалам
-📊 <b>Анализ</b> – статистика и разбор ответов
-💬 <b>Обратная связь</b> – ваши предложения и поддержка
 ⚙️ <b>Настройки</b> – настройка бота
 
 Выберите нужный раздел в меню ниже:
