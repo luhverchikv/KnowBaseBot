@@ -44,7 +44,7 @@ async def settings_menu(message: Message):
     # Форматируем для красивого вывода
     #diff_map = {"easy": "😊 Легкий", "medium": "🤔 Средний", "hard": "😈 Сложный"}
     #diff_text = diff_map.get(difficulty, "🤔 Средний")
-    #remind_text = "🔔 Включены" if reminders == 1 else "🔕 Выключены"
+    remind_text = "🔔 Включены" if reminders == 1 else "🔕 Выключены"
     
     text = (
         "⚙️ <b>Настройки бота</b>\n\n"
@@ -137,7 +137,7 @@ async def settings_back_to_menu(call: CallbackQuery):
     
     #diff_map = {"easy": "😊 Легкий", "medium": "🤔 Средний", "hard": "😈 Сложный"}
     #diff_text = diff_map.get(difficulty, "🤔 Средний")
-    #remind_text = "🔔 Включены" if reminders == 1 else "🔕 Выключены"
+    remind_text = "🔔 Включены" if reminders == 1 else "🔕 Выключены"
     
     text = (
         "⚙️ <b>Настройки бота</b>\n\n"
